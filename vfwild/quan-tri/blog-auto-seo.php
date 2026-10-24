@@ -10,6 +10,7 @@ declare(strict_types=1);
 if (!defined('VFW_ADMIN')) { http_response_code(404); exit; }
 require_once __DIR__ . '/blog-auto-acc.php';   // kiến thức phụ kiện học từ chungauto.vn
 require_once __DIR__ . '/blog-auto-ref.php';   // bài tham khảo cùng chủ đề trên chungauto.vn
+require_once __DIR__ . '/blog-auto-research.php';   // tra cứu dữ kiện trên web (nguồn chính thức, không lấy chungauto.vn)
 
 /** len = hệ số nhân với "số từ tối thiểu" trong cài đặt; h2/h3 = số đề mục tối thiểu; facets = các khía cạnh chuyên môn cần chạm tới. */
 const AUTO_BLUEPRINTS = [
@@ -244,7 +245,17 @@ function auto_format_rules(string $kw): string {
         . "- Từ khóa phụ: mỗi cụm dùng tối đa 1–2 lần, chỉ ở câu mà nó đọc tự nhiên; KHÔNG in đậm từ khóa phụ; không ghép nhiều từ khóa phụ trong một câu, không viết câu chỉ để chứa từ khóa. Đặc biệt không kết mục bằng câu kiểu \"Những kinh nghiệm … này giúp bạn …\", \"Tuân thủ đúng quy trình … sẽ …\", \"Tham khảo … giúp bạn chủ động …\": câu chốt phải có thông tin mới, không có thì bỏ. Đọc lên phải như người viết thật.\n"
         . "- Tên riêng viết hoa đúng: Honda City, VinFast VF Wild, VF6, Toyota, Apple CarPlay… (kể cả khi từ khóa phụ trong Sheet viết thường).\n"
         . "- Liên kết nội bộ chỉ chèn vào câu khi đúng chủ đề câu đó; không có trang liên quan thì đừng gượng ép (hệ thống tự thêm mục \"Xem thêm\" cuối bài).\n"
-        . auto_voice_rules();
+        . auto_voice_rules()
+        . auto_onpage_rules($kw);
+}
+/** SEO trên trang: tiêu đề Google, mô tả, tiêu đề mục, câu trả lời ngắn cho đoạn trích nổi bật và chatbot AI. */
+function auto_onpage_rules(string $kw): string {
+    return "SEO TRÊN TRANG (bắt buộc):\n"
+        . "- seo_title: từ khóa chính \"$kw\" nằm trong 5 chữ đầu, 45–58 ký tự, nêu lợi ích hoặc điểm khác biệt của bài (với chủ đề giá, quy định, chính sách thì thêm năm " . date('Y') . "); khác tiêu đề các bài cùng chủ đề đã có.\n"
+        . "- description: 140–155 ký tự, chứa từ khóa chính, có một con số hoặc lợi ích cụ thể, kết bằng một lời mời nhẹ (xem bảng, xem cách tính…), không lặp nguyên văn câu mở bài.\n"
+        . "- 2–3 tiêu đề H2 chứa từ khóa phụ hoặc biến thể tự nhiên của từ khóa chính (không lặp y hệt một cụm ở mọi mục). Có ít nhất một H2 viết dạng câu hỏi người dùng hay gõ.\n"
+        . "- Ngay dưới mỗi H2 dạng câu hỏi, câu đầu tiên trả lời trực tiếp trong 1–2 câu (40–50 chữ), đủ ý khi đứng riêng, để Google lấy làm đoạn trích nổi bật và chatbot AI trích dẫn.\n"
+        . "- Mỗi bảng có một câu dẫn ngay trên bảng nói bảng so sánh gì; cột đầu là tên mục rõ ràng.\n";
 }
 /**
  * Cụm "văn mẫu" lặp ở hàng trăm tới hơn nghìn bài chungauto.vn (thống kê 2.137 bài, 24/10/2026) và các cụm sáo hay gặp ở bài AI.
@@ -367,6 +378,53 @@ function auto_faq_short(string $body, int $min = 30): int {
     $close();
     return $short;
 }
+/**
+ * Các bài đã có trên vfwild.vn cùng chủ đề với từ khóa (đã đăng và nháp, khớp từ 60% chữ của từ khóa ở tiêu đề / thẻ / tiêu đề mục):
+ * để bài mới chọn góc khác, không lặp nội dung, và liên kết tới bài cũ. Trả về tối đa $n bài: ['title','slug','state','heads','body'].
+ */
+function auto_related_existing(array $posts, string $kw, int $n = 4): array {
+    $tok = auto_tok($kw);
+    if (!$tok) return [];
+    $rank = [];
+    foreach ($posts as $p) {
+        $st = blog_state($p);
+        if (!in_array($st, ['published', 'draft', 'scheduled'], true)) continue;
+        preg_match_all('/^##\s+(.+)$/mu', (string)$p['body'], $hm);
+        $heads = array_map(fn($h) => trim(preg_replace('/^\d{1,2}\s*[.):]\s+/u', '', $h) ?? $h), $hm[1] ?? []);
+        $sc = max(auto_hit($tok, $p['title'] . ' ' . ($p['tags'] ?? '')), auto_hit($tok, implode(' ', $heads)) * 0.9);
+        foreach (explode(',', (string)($p['tags'] ?? '')) as $tag) {   // thẻ của bài cũ nằm trọn trong từ khóa mới ("thảm vf wild" ⊂ "thảm lót sàn vf wild") = cùng chủ đề
+            $tt = auto_tok($tag);
+            if ($tt && strlen(implode('', $tt)) >= 4 && !array_diff($tt, $tok)) { $sc = max($sc, 1.0); break; }
+        }
+        if ($sc >= 0.6) $rank[] = [$sc, $p['date'] ?? '', ['title' => (string)$p['title'], 'slug' => (string)$p['slug'], 'state' => $st, 'heads' => array_slice($heads, 0, 10), 'body' => (string)$p['body']]];
+    }
+    usort($rank, fn($a, $b) => [$b[0], $b[1]] <=> [$a[0], $a[1]]);
+    return array_column(array_slice($rank, 0, $n), 2);
+}
+/** Lời dặn tránh trùng với các bài cùng chủ đề đã có trên vfwild.vn. */
+function auto_related_prompt(array $rel): string {
+    if (!$rel) return '';
+    $l = [];
+    foreach ($rel as $p) $l[] = '  - "' . $p['title'] . '"' . ($p['state'] === 'published' ? ' (đã đăng: /blog/' . $p['slug'] . '/)' : ' (bản nháp)') . ($p['heads'] ? ' – các mục: ' . implode('; ', array_filter($p['heads'], fn($h) => !preg_match('/^(câu hỏi|kết luận|xem thêm|nguồn)/iu', $h))) : '');
+    return "- BÀI CÙNG CHỦ ĐỀ ĐÃ CÓ TRÊN VFWILD.VN (bài mới KHÔNG được lặp lại các bài này):\n" . implode("\n", $l) . "\n"
+        . "  Chọn góc khác (đối tượng người đọc, tình huống sử dụng, một khía cạnh đào sâu hơn, thông tin mới hơn); tiêu đề bài và tiêu đề mục khác hẳn; ý nào bài cũ đã viết kỹ thì chỉ nhắc một câu và chèn liên kết tới bài cũ (chỉ bài đã đăng); không chép câu, bảng hay câu hỏi thường gặp của bài cũ.\n";
+}
+/** So bài mới với các bài cùng chủ đề đã có: [vấn đề buộc viết lại, cảnh báo]. */
+function auto_related_overlap(string $body, string $title, array $rel): array {
+    $issues = []; $warns = [];
+    $norm = fn(string $s) => trim(preg_replace('/\s+/u', ' ', preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', mb_strtolower($s, 'UTF-8')) ?? '') ?? '');
+    preg_match_all('/^##\s+(.+)$/mu', $body, $hm);
+    $myH = array_map(fn($h) => $norm(preg_replace('/^\d{1,2}\s*[.):]\s+/u', '', $h) ?? $h), $hm[1] ?? []);
+    foreach ($rel as $p) {
+        $cp = auto_copy_ratio($body, $p['body'], 6);
+        $sameH = count(array_filter(array_map($norm, $p['heads']), fn($h) => $h !== '' && !preg_match('/^(câu hỏi thường gặp|kết luận|xem thêm|nguồn tham khảo)/u', $h) && in_array($h, $myH, true)));
+        if ($cp >= 0.12) $issues[] = 'Trùng ' . round($cp * 100) . '% câu chữ với bài đã có "' . $p['title'] . '": viết góc khác, không lặp nội dung.';
+        elseif ($cp >= 0.05) $warns[] = 'Có ' . round($cp * 100) . '% câu chữ giống bài "' . $p['title'] . '".';
+        if ($norm($title) === $norm($p['title'])) $issues[] = 'Tiêu đề trùng bài đã có "' . $p['title'] . '".';
+        if ($sameH >= 3) $warns[] = "Có {$sameH} tiêu đề mục trùng bài \"" . $p['title'] . '".';
+    }
+    return [$issues, $warns];
+}
 /** Lời dặn riêng cho bài phụ kiện / độ xe VF Wild (rút ra từ cách viết và các lỗi hay gặp trên chungauto.vn). */
 function auto_accessory_rules(string $kw): string {
     $wild = !auto_kw_other_car($kw);   // từ khóa không nêu xe nào khác: mặc định là phụ kiện cho VF Wild (website vfwild.vn)
@@ -408,6 +466,8 @@ function auto_blueprint_prompt(array $item, array $s): string {
         . "- ĐOẠN MỞ ĐẦU (30–70 từ, chứa từ khóa chính): {$bp['open']}. Không mở bài bằng câu chung chung về xu hướng hay thị trường.\n"
         . (($item['type'] ?? '') === 'phu-kien' ? auto_accessory_rules((string)($item['keyword'] ?? '')) : '')
         . (!empty($item['ref']) ? auto_ref_prompt($item['ref'], auto_outline_h2($note) !== []) : '')
+        . (!empty($item['research']) ? auto_research_rules(!empty($item['ref'])) : '')
+        . auto_related_prompt((array)($item['related'] ?? []))
         . auto_format_rules(auto_kw_core($kwi) !== '' ? auto_kw_core($kwi) : $kwi)
         . AUTO_QUALITY_RULES;
     $prev = trim((string)($item['prev'] ?? ''));
@@ -553,7 +613,8 @@ function auto_score(array $post, array $s, string $facts, array $row = []): arra
     $eff = blog_effective_title($post); $tl = blog_len($eff);
     $check('title', $tl >= 25 && $tl <= 60 && auto_hit($ktok, $eff) >= 0.6, 8, "Tiêu đề Google nên dài 25–60 ký tự và chứa từ khóa chính (hiện $tl ký tự).");
     $d = blog_len((string)$post['description']);
-    $check('meta', $d >= 70 && $d <= 160, 6, "Mô tả $d ký tự (nên 70–160).");
+    $dKw = auto_hit($ktok, (string)$post['description']) >= 0.6;   // mô tả trên Google phải có từ khóa chính (Google in đậm chữ khớp, tăng tỉ lệ bấm)
+    $check('meta', $d >= 70 && $d <= 160 && $dKw, 6, "Mô tả $d ký tự (nên 70–160)" . ($dKw ? '' : ', chưa chứa từ khóa chính') . '.');
     $check('no_h1', !preg_match('/^#\s/m', $body), 3, 'Thân bài không được có tiêu đề H1.');
     $paras = array_values(array_filter(preg_split('/\n\s*\n/', trim($body)) ?: [], fn($x) => !preg_match('/^(#|\||[-*]\s|\d+\.\s)/', ltrim($x))));
     preg_match_all('/^##\s+(.*)$/mu', $body, $hm);
@@ -618,5 +679,5 @@ function auto_score(array $post, array $s, string $facts, array $row = []): arra
     $bad = [];   // cụm cấm (quảng cáo quá đà) là lỗi nặng: không cho đăng
     $bad = auto_forbidden_hits($post['title'] . ' ' . $body, (string)$s['forbidden']);
     if ($bad) { $issues[] = 'Có cụm không được dùng: ' . implode(', ', $bad) . '.'; $score = min($score, 49); }
-    return ['score' => $score, 'issues' => $issues, 'words' => $w, 'warnings' => $warnings, 'checks' => $checks];
+    return ['score' => $score, 'issues' => $issues, 'words' => $w, 'warnings' => $warnings, 'checks' => $checks, 'force' => (bool)$bad];
 }

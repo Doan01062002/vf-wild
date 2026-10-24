@@ -119,7 +119,7 @@ function auto_save_json(string $f, array $d): void {
 function auto_defaults(): array {
     return [
         'enabled' => false, 'mode' => 'publish', 'default_hour' => 9,
-        'provider' => 'mock', 'models' => [], 'gsc_site' => '', 'backlink' => true, 'auto_cover' => false, 'review_weekly' => true, 'auto_plan' => true, 'auto_plan_note' => true, 'img_vision_always' => false, 'ref_enabled' => true, 'max_images' => 6, 'min_words' => 600, 'min_score' => 70, 'max_attempts' => 3,
+        'provider' => 'mock', 'models' => [], 'gsc_site' => '', 'backlink' => true, 'auto_cover' => false, 'review_weekly' => true, 'auto_plan' => true, 'auto_plan_note' => true, 'img_vision_always' => false, 'ref_enabled' => true, 'web_research' => true, 'max_images' => 6, 'min_words' => 600, 'min_score' => 70, 'max_attempts' => 3,
         'sheet_url' => '',
         'forbidden' => AUTO_FORBIDDEN_DEFAULT,
         'tone' => AUTO_TONE_DEFAULT,
@@ -535,9 +535,11 @@ function auto_row_facts(string $DIR, array $s, array $r): array {
     $facts = auto_facts($DIR);
     $type = (string)($r['type'] ?? auto_type_for((string)($r['category'] ?? ''), (string)($r['form'] ?? ''), $kw));
     if ($type === 'phu-kien') $facts .= "\n\n" . (auto_kw_other_car($kw) ? AUTO_ACC_GENERAL : auto_accessory_facts($kw));   // kiến thức phụ kiện học từ chungauto.vn (nhóm khớp từ khóa); bài cho xe khác chỉ lấy phần chung, vì số liệu trong các nhóm là của VF Wild
-    $ref = !empty($s['ref_enabled']) && $s['provider'] !== 'mock' ? auto_ref_article($DIR, $kw) : null;   // bài cùng chủ đề trên chungauto.vn: dàn ý gợi ý + dữ kiện
+    $res = auto_research($DIR, $s, $kw, $type);   // tra cứu web (nguồn chính thức, không lấy chungauto.vn): đứng trước bài tham khảo
+    if ($res) $facts .= "\n\n" . auto_research_facts($res);
+    $ref = !empty($s['ref_enabled']) && $s['provider'] !== 'mock' ? auto_ref_article($DIR, $kw) : null;   // bài cùng chủ đề trên chungauto.vn: ý cần phủ + dữ kiện của ChungAuto
     if ($ref) $facts .= "\n\n" . auto_ref_facts($ref);
-    return [$facts, $ref];
+    return [$facts, $ref, $res];
 }
 function auto_process(string $DIR, array $r, array $s): array {
     $attempts = $r['attempts'] + 1;
@@ -555,8 +557,9 @@ function auto_process(string $DIR, array $r, array $s): array {
         }
         auto_row_set($DIR, $s, $r['row'], 'Đang xử lý', ['', '', '', '', '', '', $now, '', $attempts]);
         $posts = blog_all($DIR);
-        [$facts, $r['ref']] = auto_row_facts($DIR, $s, $r);
-        $gap =$s['provider'] === 'mock' ? null : auto_facts_gap($kw, $r, $facts);
+        [$facts, $r['ref'], $r['research']] = auto_row_facts($DIR, $s, $r);
+        $r['related'] = auto_related_existing($posts, $kw);   // bài cùng chủ đề đã có trên vfwild.vn: bài mới chọn góc khác, không lặp
+        $gap = $s['provider'] === 'mock' ? null : auto_facts_gap($kw, $r, $facts);
         if ($gap !== null) {   // bộ dữ kiện không nói gì về chủ đề: viết ra chỉ là chữ độn, nên dừng và báo cho biên tập bổ sung
             $why = 'Thiếu dữ kiện về "' . $gap . '". Hãy thêm thông tin này vào Bộ dữ kiện (hoặc ghi dữ kiện vào cột Ghi chú) rồi đặt lại trạng thái "Sẵn sàng".';
             auto_row_set($DIR, $s, $r['row'], 'Tạm dừng', ['', '', '', '', '', '', $now, $why, $attempts]);
@@ -592,10 +595,14 @@ function auto_process(string $DIR, array $r, array $s): array {
         if ($video !== '') { $vp = blog_video_parse($video); if ($vp) $video = $vp['url']; else { $videoWarn = 'Link video chưa nhận dạng được (dùng YouTube, Vimeo hoặc .mp4) nên đã bỏ qua.'; $video = ''; } }
         $accCat = $r['type'] === 'phu-kien' ? (array_values(array_filter($cats, fn($c) => mb_stripos($c, 'phụ kiện', 0, 'UTF-8') !== false))[0] ?? '') : '';   // bài phụ kiện để trống chuyên mục: vào chuyên mục "Phụ kiện…" nếu site có
         $cat = $r['category'] !== '' ? $r['category'] : ($accCat !== '' ? $accCat : (in_array($gen['category'] ?? '', $cats, true) ? $gen['category'] : AUTO_TYPES[$r['type']]));
-        $slug = blog_slugify($gen['title']);
-        for ($n = 2; is_file(blog_dir($DIR) . "/$slug.md") && $n < 20; $n++) $slug = blog_slugify($gen['title']) . '-' . $n;
+        // đường dẫn ngắn theo từ khóa chính (tốt cho SEO: "ca-vet-xe-la-gi" thay vì cả câu tiêu đề); đã có bài dùng thì lấy theo tiêu đề (rút gọn), rồi mới thêm -2, -3…
+        $slugBase = blog_slugify($kw);
+        if ($slugBase === '' || is_file(blog_dir($DIR) . "/$slugBase.md")) { $t = blog_slugify(trim(preg_split('/[:|–]/u', (string)$gen['title'])[0] ?? '')); $slugBase = $t !== '' && !is_file(blog_dir($DIR) . "/$t.md") ? $t : ($slugBase !== '' ? $slugBase : blog_slugify($gen['title'])); }
+        $slug = $slugBase;
+        for ($n = 2; is_file(blog_dir($DIR) . "/$slug.md") && $n < 20; $n++) $slug = $slugBase . '-' . $n;
         $mock = $s['provider'] === 'mock';
         $bodyFinal = auto_ensure_links(auto_ensure_conclusion(trim(str_replace("\r\n", "\n", $gen['body']))), $links);
+        if (!empty($r['research']) && !preg_match('/^##\s+(\d+\.\s*)?(nguồn tham khảo|tài liệu tham khảo)/miu', $bodyFinal)) $bodyFinal = rtrim($bodyFinal) . "\n\n" . auto_sources_section($r['research']);   // nguồn chính thức đã tra (E-E-A-T, chatbot AI trích dẫn)
         if ($video !== '' && $videoHint !== '') { $vw = ''; $bodyFinal = auto_video_mark($bodyFinal, $videoHint, $vw); if ($vw !== '') $videoWarn = trim($videoWarn . ' ' . $vw); }
         $bodyFinal = auto_fix_names(auto_unbold_subs($bodyFinal, auto_subs($r), $kw), $kw);   // bỏ in đậm từ khóa phụ; viết hoa đúng tên xe, tên hãng
         $bodyFinal = auto_bold_keyword($bodyFinal, $kw);   // in đậm từ khóa chính ở đoạn mở đầu và mỗi mục nếu AI quên
@@ -611,13 +618,20 @@ function auto_process(string $DIR, array $r, array $s): array {
         if ($r['ref']) {   // viết từ bài tham khảo: đo mức chép câu chữ (chép nhiều thì bắt viết lại, chép ít thì nhắc biên tập)
             $cp = auto_copy_ratio($bodyFinal, $r['ref']['text'], 6);   // cụm 6 từ liên tiếp: bắt cả kiểu chép đổi vài chữ
             $sameH = auto_ref_same_headings($bodyFinal, $r['ref']); $refH = count(array_filter((array)$r['ref']['outline'], fn($l) => str_starts_with($l, 'H2:')));
-            if ($cp >= 0.15) { $sc['issues'][] = 'Chép câu chữ của bài tham khảo ' . round($cp * 100) . '% (phải viết lại bằng lời và giọng văn riêng, không quá 6 từ liên tiếp giống bài tham khảo).'; $sc['score'] = min($sc['score'], 49); }
+            if ($cp >= 0.15) { array_unshift($sc['issues'], 'Chép câu chữ của bài tham khảo ' . round($cp * 100) . '% (phải viết lại bằng lời và giọng văn riêng, không quá 6 từ liên tiếp giống bài tham khảo).'); $sc['score'] = min($sc['score'], 49); $sc['force'] = true; }
             elseif ($cp >= 0.05) $sc['warnings'][] = 'Có ' . round($cp * 100) . '% câu chữ giống bài tham khảo ' . $r['ref']['url'] . ', nên đọc lại.';
-            if ($sameH >= 3 && $sameH * 2 >= max(1, $refH)) { $sc['issues'][] = "Có $sameH tiêu đề mục trùng nguyên văn bài chungauto.vn: hãy đặt tên mục theo cách nói riêng."; $sc['score'] = min($sc['score'], 49); }
+            if ($sameH >= 3 && $sameH * 2 >= max(1, $refH)) { array_unshift($sc['issues'], "Có $sameH tiêu đề mục trùng nguyên văn bài chungauto.vn: hãy đặt tên mục theo cách nói riêng."); $sc['score'] = min($sc['score'], 49); $sc['force'] = true; }
             elseif ($sameH > 0) $sc['warnings'][] = "Có $sameH tiêu đề mục trùng bài tham khảo.";
             $sc['warnings'][] = 'Dùng bài tham khảo: ' . $r['ref']['url'] . '.';
         }
-        if ($sc['score'] < (int)$s['min_score']) {
+        if ($r['related'] && !$mock) {   // không lặp bài cùng chủ đề đã có trên vfwild.vn: các lần đầu bắt viết lại góc khác; lần thử cuối vẫn lưu (kèm cảnh báo) để cùng từ khóa luôn viết được
+            [$ri, $rw] = auto_related_overlap($bodyFinal, $in['title'], $r['related']);
+            if ($ri && $attempts < (int)$s['max_attempts']) { $sc['issues'] = array_merge($ri, $sc['issues']); $sc['score'] = min($sc['score'], 49); $sc['force'] = true; }
+            elseif ($ri) $rw = array_merge($ri, $rw);
+            $sc['warnings'] = array_merge($sc['warnings'], $rw);
+        }
+        if (!empty($r['research'])) $sc['warnings'][] = 'Đã tra cứu ' . count($r['research']['facts']) . ' dữ kiện trên web (' . implode(', ', array_slice(array_column((array)$r['research']['sources'], 'host'), 0, 4)) . ').';
+        if ($sc['score'] < (int)$s['min_score'] || !empty($sc['force'])) {   // force: lỗi buộc viết lại (cụm cấm, chép, trùng bài) dù điểm tối thiểu đặt thấp
             $msg = 'Điểm ' . $sc['score'] . '/100: ' . implode(' ', $sc['issues']);
             $final = $attempts >= (int)$s['max_attempts'];
             auto_row_set($DIR, $s, $r['row'], $final ? 'Lỗi' : 'Sẵn sàng', ['', '', '', '', $sc['score'], $sc['words'], $now, mb_substr($msg, 0, 300), $attempts]);
@@ -702,8 +716,10 @@ function auto_plan_prompt(array $r, array $blank, array $posts, array $cats, str
             . ($type === 'phu-kien' && auto_kw_other_car((string)$r['keyword']) ? str_replace([' (dựa vào đặc điểm thật của xe: bán tải điện, thùng hàng, đi phố và đi dã ngoại)', 'VF Wild'], ['', 'xe trong từ khóa'], $bp['outline']) . " Bài này cho xe trong từ khóa, không gắn dữ kiện VF Wild." : $bp['outline']) . "\n" : '')
         . ($note && $ref && $ref['outline'] ? "CÁC Ý MÀ BÀI CÙNG CHỦ ĐỀ trên chungauto.vn ĐÃ PHỦ (chỉ để không sót ý; TỰ ĐẶT tên mục H1/H2 theo cách nói riêng của vfwild.vn, KHÔNG chép nguyên văn các tiêu đề này, được đổi thứ tự, gộp, tách hoặc thêm mục; số liệu của bài này nằm ở mục \"Bài tham khảo cùng chủ đề\" trong bộ dữ kiện):\n" . implode("\n", array_map(fn($l) => '  ' . $l, $ref['outline'])) . "\n" : '')
         . ($note && $imgNames ? "DANH SÁCH ẢNH biên tập đã chuẩn bị (tên tệp, theo thứ tự):\n" . implode("\n", array_map(fn($n) => '- ' . $n, $imgNames)) . "\n" : '')
+        . "Số liệu ưu tiên lấy từ bộ dữ kiện của site và mục \"Dữ kiện tra cứu trên web\" (nguồn chính thức); số liệu của bài tham khảo chungauto.vn chỉ dùng cho giá, sản phẩm, dịch vụ của ChungAuto.\n"
         . "BỘ DỮ KIỆN của website (chỉ chọn mục/ý mà bộ dữ kiện này có thông tin):\n" . mb_substr($facts, 0, 30000, 'UTF-8') . "\n"
         . ($titles !== '' ? "Các bài đã có trên blog (chỉ để chọn góc viết khác và liên kết ý, không bắt buộc):\n$titles\n" : '')
+        . ($note && !empty($r['related']) ? auto_related_prompt($r['related']) : '')
         . "\nTrả về JSON đúng khuôn: {\"category\": một trong [" . implode(', ', $cats) . "], \"form\": một trong [" . implode(', ', AUTO_FORMS) . "], \"intent\": một trong [" . implode(', ', AUTO_INTENTS) . "], \"priority\": một trong [" . implode(', ', AUTO_PRIOS) . "], "
         . "\"sub_keywords\": mảng 4–8 cụm từ khóa phụ người mua thật sự gõ tìm (viết thường trừ tên riêng viết hoa đúng như Honda City, VF Wild, VinFast; tiếng Việt CÓ DẤU đầy đủ và đúng chính tả, 2–6 từ, cùng ý định với từ khóa chính, không trùng từ khóa chính)" . ($note ? (", "
         . "\"angle\": chuỗi nhiều dòng là DÀN Ý CHI TIẾT cho ô Ghi chú (trong chuỗi này KHÔNG dùng dấu ngoặc kép, cần trích dẫn thì dùng ngoặc đơn; xuống dòng bằng \\n), đúng cú pháp sau (mỗi dòng một ý):dòng \"H1: tiêu đề bài (25–60 ký tự, chứa từ khóa chính)\"; dòng \"Đối tượng: người đọc là ai và đang cần quyết định gì\"; dòng \"Góc khác biệt: bài này hơn các bài khác ở điểm nào\"; dòng bắt đầu bằng \"Mở bài:\" rồi 2–3 câu chỉ dẫn nêu sẵn câu trả lời ngắn cho từ khóa chính bằng dữ kiện có thật (viết thẳng nội dung, không lặp lại câu hướng dẫn này); giọng trung tính, không dùng từ quảng cáo như độc quyền, hấp dẫn, tuyệt vời; " . $imgRule
@@ -778,6 +794,7 @@ function auto_plan_row(string $DIR, array $s, array $r, array $posts): array {
     if (!$blank) return $r;
     $p = (string)$s['provider'];
     [$facts, $ref] = auto_row_facts($DIR, $s, $r);
+    $r['related'] = auto_related_existing($posts, (string)$r['keyword']);   // dàn ý chọn góc khác các bài cùng chủ đề đã có
     $imgNames = [];   // tên tệp ảnh thật (chỉ đọc danh sách, chưa tải ảnh) để dàn ý ghi đúng ảnh nào vào mục nào
     if (in_array('note', $blank, true) && trim((string)($r['images_cell'] ?? '')) !== '') {
         $ie = [];
@@ -890,7 +907,7 @@ function auto_post(string $act, string $DIR): array {
             }
             $s = [
                 'provider' => $prov, 'models' => $models,
-                'gsc_site' => $gscSite, 'backlink' => ($_POST['backlink'] ?? '') === '1', 'auto_plan' => ($_POST['auto_plan'] ?? '') === '1', 'auto_plan_note' => ($_POST['auto_plan_note'] ?? '') === '1', 'img_vision_always' => ($_POST['img_vision_always'] ?? '') === '1', 'ref_enabled' => ($_POST['ref_enabled'] ?? '') === '1','auto_cover' => ($_POST['auto_cover'] ?? '') === '1', 'review_weekly' => ($_POST['review_weekly'] ?? '') === '1', 'max_images' => max(1, min(IMG_HARD_MAX, (int)($_POST['max_images'] ?? 6))),
+                'gsc_site' => $gscSite, 'backlink' => ($_POST['backlink'] ?? '') === '1', 'auto_plan' => ($_POST['auto_plan'] ?? '') === '1', 'auto_plan_note' => ($_POST['auto_plan_note'] ?? '') === '1', 'img_vision_always' => ($_POST['img_vision_always'] ?? '') === '1', 'ref_enabled' => ($_POST['ref_enabled'] ?? '') === '1', 'web_research' => ($_POST['web_research'] ?? '') === '1','auto_cover' => ($_POST['auto_cover'] ?? '') === '1', 'review_weekly' => ($_POST['review_weekly'] ?? '') === '1', 'max_images' => max(1, min(IMG_HARD_MAX, (int)($_POST['max_images'] ?? 6))),
                 'sheet_url' => $sheet, 'default_hour' => max(0, min(23, (int)($_POST['default_hour'] ?? 9))),
                 'mode' => ($_POST['draft_only'] ?? '') === '1' ? 'draft' : 'publish',
                 'min_words' => max(300, min(10000, (int)($_POST['min_words'] ?? $s['min_words']))), 'min_score' => max(50, min(100, (int)($_POST['min_score'] ?? $s['min_score']))),
