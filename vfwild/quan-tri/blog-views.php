@@ -202,7 +202,7 @@ function blog_media_modal(): void { ?>
 /** Popup "Gắn ảnh vào bài": 1. chọn ảnh (máy / Drive) → 2. duyệt mục, alt, chú thích → 3. chèn (attach.js). */
 function blog_attach_modal(): void { ?>
   <dialog id="att" class="mm att" aria-labelledby="att-t"><div class="mm__in">
-    <div class="mm__h"><h2 id="att-t">Gắn ảnh vào bài</h2><button type="button" class="lnk" id="att-x">✕ Đóng</button></div>
+    <div class="mm__h"><h2 id="att-t">Tự động gắn ảnh vào bài</h2><button type="button" class="lnk" id="att-x">✕ Đóng</button></div>
     <ol class="att__steps" aria-label="Các bước"><li class="on" data-step="1">1. Chọn ảnh</li><li data-step="2">2. Duyệt chỗ đặt</li><li data-step="3">3. Chèn vào bài</li></ol>
     <div class="att__body">
       <section id="att-s1">
@@ -287,7 +287,7 @@ function blog_view_edit(string $DIR, string $csrf, string $nonce, ?array $formSt
         <div>
           <div class="editor-head">
             <button type="button" class="btn btn--ghost sm" id="add-media">🖼 Thêm ảnh</button>
-            <button type="button" class="btn btn--ghost sm" id="att-open" title="Tải nhiều ảnh lên, hệ thống đề xuất mục, mô tả và chú thích cho từng ảnh để bạn duyệt rồi chèn vào bài">📷 Gắn ảnh vào bài</button>
+            <button type="button" class="btn btn--ghost sm" id="att-open" title="Tải nhiều ảnh lên, hệ thống đề xuất mục, mô tả và chú thích cho từng ảnh để bạn duyệt rồi chèn vào bài">📷 Tự động gắn ảnh vào bài</button>
             <button type="button" class="lnk small" id="att-rename" title="Đổi tên các ảnh đang mang mã ngẫu nhiên (b8c339…) thành tên theo nội dung bài và mục chứa ảnh">Đặt lại tên ảnh theo nội dung</button>
             <span class="small" id="att-note" role="status" aria-live="polite"></span>
             <div class="tabs2" role="tablist" aria-label="Chế độ soạn thảo"><button type="button" class="on" data-mode="visual" role="tab" aria-selected="true">Trực quan</button><button type="button" data-mode="md" role="tab" aria-selected="false">Văn bản</button></div>
