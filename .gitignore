@@ -1,0 +1,30 @@
+# Khóa bí mật và dữ liệu thật: KHÔNG BAO GIỜ đưa lên git
+secrets/
+private-local/
+*.key
+*.key.txt
+google-service-account*.json
+secret.json
+gs-token*.json
+leads*.csv
+config.php
+admin.json
+TEST_LOGIN.txt
+
+# Bản sao lưu thủ công (lịch sử nay do git giữ)
+backup/
+
+# File tạm khi dựng video hướng dẫn
+tools/video/frames/
+tools/video/audio/
+tools/video/_profile-*/
+tools/video/*.mp3
+tools/video/*.wav
+
+# Rác hệ thống
+__pycache__/
+*.pyc
+*.log
+.DS_Store
+Thumbs.db
+desktop.ini

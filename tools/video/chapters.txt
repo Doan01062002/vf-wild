@@ -1,0 +1,15 @@
+0:00  Mở đầu
+0:12  Bước 1 · Đăng nhập
+0:26  Bước 2 · Menu chính
+0:54  Bước 3 · Danh sách bài viết
+1:20  Bước 4 · Viết và sửa bài
+2:57  Bước 5 · Thư viện ảnh
+3:12  Bước 6 · Chuyên mục
+3:26  Bước 7 · Tự động viết bài
+3:50  Bước 8 · Google Sheet điều khiển máy viết bài
+5:27  Bước 9 · Lịch đăng và cài đặt
+6:02  Bước 10 · Kiểm tra nội dung
+6:22  Bước 11 · Review và học
+6:39  Bước 12 · Người dùng và tài khoản
+7:22  Bước 13 · Kết quả trên website
+7:56  Tóm tắt

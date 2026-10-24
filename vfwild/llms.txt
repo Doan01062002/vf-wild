@@ -1,0 +1,21 @@
+# VF Wild ChungAuto (vfwild.vn)
+
+> Website tư vấn và hỗ trợ mua VinFast VF Wild do Công ty Cổ phần Chung Group (ChungAuto) vận hành: giá niêm yết và giá sau ưu đãi, chi phí lăn bánh theo tỉnh, trả góp, đặt cọc, lái thử. Đây không phải website chính thức của VinFast (vinfastauto.com). Giá và ưu đãi mang tính tham khảo; báo giá bằng văn bản của tư vấn viên là con số cuối cùng.
+
+## Trang chính
+- [Trang chủ – giá, ưu đãi, thông số VF Wild](https://vfwild.vn/): giá niêm yết 860 triệu (Đen, Đỏ, Trắng) và 872 triệu (Bạc), thông số kỹ thuật, máy tính chi phí vận hành
+- [Giá lăn bánh VF Wild theo tỉnh](https://vfwild.vn/gia-lan-banh-vf-wild/): tổng chi phí ra biển tại từng tỉnh, lệ phí trước bạ 0%
+- [Tính trả góp VF Wild](https://vfwild.vn/tra-gop-vf-wild/): ước tính tiền trả mỗi tháng theo số tiền vay, số năm và lãi suất
+- [Đặt cọc & O2O](https://vfwild.vn/dat-coc-vf-wild/): quy trình đặt cọc tại showroom hoặc online qua kênh O2O của VinFast
+- [Đăng ký lái thử VF Wild](https://vfwild.vn/lai-thu-vf-wild/)
+- [Nguồn dữ liệu](https://vfwild.vn/nguon-du-lieu/): nguồn và ngày kiểm tra của mọi con số trên website
+
+## Blog
+- [Blog VF Wild](https://vfwild.vn/blog/): bài viết về giá, chi phí, so sánh, thủ tục và công nghệ REEV
+- [RSS](https://vfwild.vn/blog/feed.xml): các bài mới nhất
+- [Sitemap](https://vfwild.vn/sitemap.xml): danh sách đầy đủ các trang
+
+## Về đơn vị vận hành
+- [Về ChungAuto](https://vfwild.vn/ve-chung-toi/): thông tin doanh nghiệp, liên hệ, cách ghi nguồn và cập nhật nội dung
+- [Điều khoản sử dụng](https://vfwild.vn/dieu-khoan/)
+- [Chính sách bảo mật](https://vfwild.vn/chinh-sach-bao-mat/)

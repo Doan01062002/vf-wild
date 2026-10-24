@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><title>Google Sheet minh họa</title>
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{width:1280px;height:720px;overflow:hidden}
+body{font-family:Arial,"Segoe UI",system-ui,sans-serif;background:#f8f9fa;color:#202124}
+.bar{height:56px;background:#fff;border-bottom:1px solid #dadce0;display:flex;align-items:center;padding:0 20px;gap:14px}
+.logo{width:26px;height:34px;background:#0f9d58;border-radius:4px;position:relative}
+.logo:after{content:"";position:absolute;left:5px;top:12px;width:16px;height:14px;border:2px solid #fff;border-radius:2px}
+.name{font-size:20px}
+.ribbon{margin-left:auto;background:#fff3cd;border:1px solid #f0d78c;color:#7a5a00;border-radius:999px;padding:6px 16px;font-size:15px;font-weight:700}
+.tabs{height:40px;display:flex;align-items:flex-end;padding:0 20px;gap:4px;background:#f1f3f4;border-bottom:1px solid #dadce0}
+.tab{padding:9px 22px;font-size:15px;border-radius:8px 8px 0 0;color:#444}
+.tab.on{background:#fff;color:#0b6b3a;font-weight:700;border:1px solid #dadce0;border-bottom:1px solid #fff;margin-bottom:-1px}
+.grid{margin:22px 20px 0}
+table{border-collapse:collapse;table-layout:fixed;width:1240px;background:#fff}
+th,td{border:1px solid #dadce0;padding:6px 6px;font-size:12px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;height:34px}
+tr.letters th{background:#f1f3f4;font-weight:400;color:#5f6368;height:24px;text-align:center}
+tr.names th{background:#e8f5ee;font-weight:700;white-space:normal;vertical-align:middle;height:46px;color:#0b4f2c}
+tr.names th.sys{background:#eceff1;color:#455a64}
+td.sys{background:#fafafa;color:#455a64}
+.ok{background:#d9f2e3;color:#0b6b3a;border-radius:10px;padding:2px 8px;font-weight:700}
+.idea{background:#fff1d6;color:#8a5a00;border-radius:10px;padding:2px 8px;font-weight:700}
+.done{background:#e3e8ff;color:#2a3a9c;border-radius:10px;padding:2px 8px;font-weight:700}
+.note{margin:18px 20px 0;color:#5f6368;font-size:15px}
+</style></head><body>
+<div class="bar"><div class="logo"></div><div class="name">Lịch viết bài vfwild.vn</div><div class="ribbon">Bảng minh họa – dữ liệu mẫu</div></div>
+<div class="tabs"><div class="tab on">Từ khóa</div><div class="tab">Hướng dẫn</div><div class="tab">Nhật ký</div></div>
+<div class="grid"><table>
+<colgroup><col style="width:140px"><col style="width:76px"><col style="width:72px"><col style="width:72px"><col style="width:62px"><col style="width:48px"><col style="width:84px"><col style="width:116px"><col style="width:146px"><col style="width:92px"><col style="width:104px"><col style="width:52px"><col style="width:88px"><col style="width:88px"></colgroup>
+<tr class="letters"><th data-col="A">A</th><th data-col="B">B</th><th data-col="C">C</th><th data-col="D">D</th><th data-col="E">E</th><th data-col="F">F</th><th data-col="G">G</th><th data-col="H">H</th><th data-col="I">I</th><th data-col="J">J</th><th data-col="K">K</th><th data-col="L">L</th><th data-col="M">M</th><th data-col="N">N</th></tr>
+<tr class="names"><th data-col="A">Từ khóa chính</th><th data-col="B">Trạng thái</th><th data-col="C">Chuyên mục</th><th data-col="D">Dạng bài</th><th data-col="E">Ý định</th><th data-col="F">Ưu tiên</th><th data-col="G">Từ khóa phụ</th><th data-col="H">Ảnh (link)</th><th data-col="I">Video (link)</th><th data-col="J">Ghi chú / góc viết</th><th data-col="K">Ngày đăng mong muốn</th><th class="sys" data-col="L">Mã</th><th class="sys" data-col="M">Tiêu đề bài</th><th class="sys" data-col="N">Link bài</th></tr>
+<tr><td data-col="A">vf wild trả góp 70% 7 năm</td><td data-col="B"><span class="ok">Sẵn sàng</span></td><td data-col="C">Chi phí</td><td data-col="D">Hướng dẫn</td><td data-col="E">Mua xe</td><td data-col="F">1</td><td data-col="G">trả góp vf wild</td><td data-col="H">drive.google.com/folders/… (0-bia, 2-pin, 4-thung)</td><td data-col="I">youtu.be/abc123xyz00 | Pin và sạc</td><td data-col="J">Nêu ví dụ tính</td><td data-col="K">2026-11-01 09:30</td><td class="sys" data-col="L"></td><td class="sys" data-col="M"></td><td class="sys" data-col="N"></td></tr>
+<tr><td data-col="A">vf wild có đáng mua không</td><td data-col="B"><span class="idea ideas">Ý tưởng</span></td><td data-col="C">Tin tức</td><td data-col="D">Tin tức</td><td data-col="E"></td><td data-col="F">2</td><td data-col="G"></td><td data-col="H"></td><td data-col="I"></td><td data-col="J"></td><td data-col="K"></td><td class="sys" data-col="L"></td><td class="sys" data-col="M"></td><td class="sys" data-col="N"></td></tr>
+<tr><td data-col="A">vf wild sạc pin bao lâu</td><td data-col="B"><span class="done">Đã đăng</span></td><td data-col="C">Công nghệ</td><td data-col="D">Công nghệ</td><td data-col="E">Tìm hiểu</td><td data-col="F">1</td><td data-col="G">sạc nhanh</td><td data-col="H"></td><td data-col="I"></td><td data-col="J"></td><td data-col="K">2026-10-22 13:47</td><td class="sys" data-col="L">VW-003</td><td class="sys" data-col="M">VF Wild sạc pin bao lâu…</td><td class="sys" data-col="N">vfwild.vn/blog/…</td></tr>
+</table></div>
+<div class="note">Tab "Từ khóa" – cột L trở đi do hệ thống tự ghi kết quả, bạn không cần nhập.</div>
+</body></html>
