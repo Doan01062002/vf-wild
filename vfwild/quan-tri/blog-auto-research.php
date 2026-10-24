@@ -112,7 +112,30 @@ function auto_research_facts(array $res): string {
 function auto_research_rules(bool $hasRef): string {
     return "- THỨ TỰ ƯU TIÊN SỐ LIỆU: (1) bộ dữ kiện VF Wild / ChungAuto của site; (2) mục \"Dữ kiện tra cứu trên web\" (nguồn chính thức, nêu nguồn trong câu khi là quy định, mức phạt hoặc số liệu thị trường, ví dụ \"theo Nghị định 168/2024/NĐ-CP\")"
         . ($hasRef ? "; (3) bài tham khảo chungauto.vn CHỈ dùng cho giá, sản phẩm, dịch vụ của ChungAuto hoặc khi (2) không có. Không lấy toàn bộ số liệu từ chungauto.vn" : '')
-        . ". Khi hai nguồn nói khác nhau, theo nguồn đứng trước và không nêu con số kia.\n";
+        . ". Khi hai nguồn nói khác nhau, theo nguồn đứng trước và không nêu con số kia.\n"
+        . "- Dữ kiện tra cứu chỉ là ý và con số: diễn đạt lại hoàn toàn bằng lời của vfwild.vn, không chép câu, cách đặt tên mục hay thứ tự mục của các trang nguồn (hệ thống sẽ so bài với chữ của từng trang nguồn).\n";
+}
+/**
+ * Chữ và dàn ý của các trang nguồn đã tra (tối đa $n trang, lưu tạm theo lần tra): để kiểm bài viết không chép câu chữ hay dàn ý của web khác.
+ * Tải qua img_http_get (chỉ https, chỉ máy chủ công cộng). Trang không tải được thì bỏ qua; không bao giờ ném lỗi.
+ */
+function auto_research_pages(string $DIR, array $res, int $n = 5): array {
+    $f = auto_dir($DIR) . '/research/' . md5(mb_strtolower(trim((string)($res['kw'] ?? '')), 'UTF-8')) . '-pages.json';
+    $c = auto_json($f, []);
+    if (isset($c['pages']) && (int)($c['t'] ?? -1) === (int)($res['t'] ?? 0)) return $c['pages'];
+    $px = getenv('VFW_PAGE_PROXY');   // chỉ để thử: tải trang qua máy giả
+    $pages = []; $t0 = time();
+    foreach (array_slice((array)($res['sources'] ?? []), 0, $n) as $x) {
+        if (time() - $t0 > 45) break;   // cả lượt tối đa khoảng 45 giây
+        try {
+            [$html, $ct] = img_http_get(is_string($px) && $px !== '' ? $px . '?u=' . rawurlencode($x['url']) : $x['url'], 12);
+            if ($ct !== '' && strpos($ct, 'html') === false) continue;   // PDF, ảnh…: không đọc
+            $pg = auto_ref_parse($html, $x['url']) ?? auto_ref_parse('</h1>' . (preg_replace('#^.*?<body\b[^>]*>#is', '', $html) ?? $html), $x['url']);   // trang không có H1: đọc từ đầu thân trang
+            if ($pg) $pages[] = ['url' => $x['url'], 'host' => $x['host'], 'outline' => $pg['outline'], 'text' => $pg['text']];
+        } catch (Throwable $e) { /* trang không tải được: bỏ qua */ }
+    }
+    auto_save_json($f, ['t' => (int)($res['t'] ?? 0), 'pages' => $pages]);
+    return $pages;
 }
 /** Mục "Nguồn tham khảo" cuối bài: tối đa $n nguồn đã kiểm (địa chỉ thật, khác tên miền, không có chungauto.vn). */
 function auto_sources_section(array $res, int $n = 4): string {

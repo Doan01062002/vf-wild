@@ -409,21 +409,120 @@ function auto_related_prompt(array $rel): string {
     return "- BÀI CÙNG CHỦ ĐỀ ĐÃ CÓ TRÊN VFWILD.VN (bài mới KHÔNG được lặp lại các bài này):\n" . implode("\n", $l) . "\n"
         . "  Chọn góc khác (đối tượng người đọc, tình huống sử dụng, một khía cạnh đào sâu hơn, thông tin mới hơn); tiêu đề bài và tiêu đề mục khác hẳn; ý nào bài cũ đã viết kỹ thì chỉ nhắc một câu và chèn liên kết tới bài cũ (chỉ bài đã đăng); không chép câu, bảng hay câu hỏi thường gặp của bài cũ.\n";
 }
-/** So bài mới với các bài cùng chủ đề đã có: [vấn đề buộc viết lại, cảnh báo]. */
-function auto_related_overlap(string $body, string $title, array $rel): array {
+const AUTO_HEAD_SKIP = '/^(câu hỏi thường gặp|hỏi đáp|kết luận|kết bài|lời kết|tổng kết|xem thêm|nguồn tham khảo|tài liệu tham khảo)/u';   // mục bài nào cũng có: không tính là trùng dàn ý
+/** Tiêu đề mục chuẩn hóa để so (bỏ "H2:", số thứ tự, dấu câu, chữ hoa). */
+function auto_head_norm(string $h): string {
+    $h = preg_replace('/^\s*(?:H2\s*:|-\s*H3\s*:)?\s*(?:\d+(?:\.\d+)*\s*[.):]?\s+)?/iu', '', $h) ?? $h;
+    return trim(preg_replace('/\s+/u', ' ', preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', mb_strtolower($h, 'UTF-8')) ?? '') ?? '');
+}
+/** Các tiêu đề mục của $mine giống một tiêu đề trong $theirs: trùng nguyên văn, hoặc cùng các chữ chính (chỉ đảo thứ tự, thêm bớt một chữ). */
+function auto_heads_alike(array $mine, array $theirs): array {
+    $stop = array_flip(['vf', 'wild', 'vinfast', 'xe', 'ô', 'tô', 'của', 'và', 'là', 'gì', 'có', 'cho', 'khi', 'nào', 'những', 'các', 'một', 'bao', 'nhiêu', 'nên', 'không', 'với', 'được', 'ở', 'tại', 'thế', 'như', 'sao', 'cần', 'biết']);
+    $words = fn(string $h): array => array_values(array_unique(array_filter(explode(' ', $h), fn($x) => $x !== '' && !isset($stop[$x]))));
+    $tw = [];
+    foreach ($theirs as $t) { $t = auto_head_norm((string)$t); if ($t !== '' && !preg_match(AUTO_HEAD_SKIP, $t)) $tw[$t] = $words($t); }
+    $out = [];
+    foreach ($mine as $m) {
+        $n = auto_head_norm((string)$m);
+        if ($n === '' || preg_match(AUTO_HEAD_SKIP, $n)) continue;
+        if (isset($tw[$n])) { $out[] = $m; continue; }
+        $mw = $words($n);
+        if (count($mw) < 2) continue;
+        foreach ($tw as $w) { if (count($w) >= 2 && count(array_intersect($mw, $w)) / count(array_unique(array_merge($mw, $w))) >= 0.75) { $out[] = $m; break; } }
+    }
+    return $out;
+}
+/** Số tiêu đề mục nội dung (không tính Câu hỏi thường gặp, Kết luận…) trong danh sách. */
+function auto_heads_count(array $heads): int { return count(array_filter($heads, fn($h) => ($n = auto_head_norm((string)$h)) !== '' && !preg_match(AUTO_HEAD_SKIP, $n))); }
+/**
+ * Mã các cụm $n chữ liên tiếp của phần văn xuôi, để đo chép câu chữ: bỏ dòng tiêu đề, dòng bảng, ảnh và mục Nguồn tham khảo; liên kết chỉ giữ chữ.
+ * Dùng mã số (crc32) thay cho chuỗi để so được với nhiều bài mà không tốn bộ nhớ.
+ */
+function auto_shingles(string $text, int $n = 6): array {
+    $text = preg_replace('/^##\s+(?:\d+\.\s*)?(?:nguồn tham khảo|tài liệu tham khảo).*?(?=^##\s|\z)/msiu', '', $text) ?? $text;
+    $text = preg_replace('/!\[[^\]]*\]\([^)]*\)/u', ' ', $text) ?? $text;
+    $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/u', '$1', $text) ?? $text;
+    $text = preg_replace('/^\s*(#|\||\[H\d\]).*$|^.*\s\|\s.*$/mu', '', $text) ?? $text;
+    $w = preg_split('/\s+/u', trim(mb_strtolower(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $text) ?? '', 'UTF-8')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $out = [];
+    for ($i = 0; $i + $n <= count($w); $i++) $out[] = crc32(implode(' ', array_slice($w, $i, $n)));
+    return $out;
+}
+/**
+ * So bài mới với MỌI bài đã có trên vfwild.vn (đã đăng, nháp, lên lịch) về câu chữ (cụm 6 chữ), tiêu đề và dàn ý, để Google không coi là nội dung trùng lặp.
+ * Câu chữ có trong bộ dữ kiện và câu mẫu lặp ở từ 3 bài trở lên (lời mời liên hệ, danh sách showroom…) không tính là chép.
+ * Trả về [vấn đề buộc viết lại, cảnh báo].
+ */
+function auto_site_overlap(string $body, string $title, array $posts, string $facts = ''): array {
     $issues = []; $warns = [];
-    $norm = fn(string $s) => trim(preg_replace('/\s+/u', ' ', preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', mb_strtolower($s, 'UTF-8')) ?? '') ?? '');
+    $all = auto_shingles($body); $tot = count($all);
+    preg_match_all('/^##\s+(.+)$/mu', $body, $hm); $myH = $hm[1] ?? []; $nH = auto_heads_count($myH);
+    $posts = array_values(array_filter($posts, fn($p) => in_array(blog_state($p), ['published', 'draft', 'scheduled'], true)));
+    $mineSet = array_flip($all); $df = [];   // lượt 1: mỗi cụm của bài mới xuất hiện ở bao nhiêu bài cũ (chỉ giữ cụm của bài mới: nhẹ bộ nhớ dù site có nhiều bài)
+    foreach ($posts as $p) { foreach (array_unique(auto_shingles((string)$p['body'])) as $h) { if (isset($mineSet[$h])) $df[$h] = ($df[$h] ?? 0) + 1; } }
+    $allow = array_flip(auto_shingles($facts));
+    $mine = array_values(array_filter($all, fn($h) => !isset($allow[$h]) && ($df[$h] ?? 0) < 3));
+    $any = 0; $wText = []; $wHead = [];
+    foreach ($mine as $h) { if (isset($df[$h])) $any++; }
+    $mineSet = array_flip($mine);
+    foreach ($posts as $p) {   // lượt 2: so với từng bài
+        $name = '"' . $p['title'] . '"';
+        $hit = 0;
+        if ($mineSet) { $set = array_flip(auto_shingles((string)$p['body'])); foreach ($mine as $h) { if (isset($set[$h])) $hit++; } }
+        $cp = $tot >= 20 ? $hit / $tot : 0.0;
+        if ($cp >= 0.12) $issues[] = 'Trùng ' . round($cp * 100) . "% câu chữ với bài đã có $name: viết góc khác, không lặp nội dung.";
+        elseif ($cp >= 0.05) $wText[] = "$name (" . round($cp * 100) . '%)';
+        if (auto_head_norm($title) !== '' && auto_head_norm($title) === auto_head_norm((string)$p['title'])) $issues[] = "Tiêu đề trùng bài đã có $name.";
+        preg_match_all('/^##\s+(.+)$/mu', (string)$p['body'], $om);
+        $same = auto_heads_alike($myH, $om[1] ?? []);
+        if (count($same) >= 3 && count($same) * 2 >= max(1, $nH)) $issues[] = "Dàn ý trùng bài đã có $name (" . count($same) . ' mục giống: ' . implode('; ', array_slice($same, 0, 3)) . '): đặt các mục theo góc khác.';
+        elseif (count($same) >= 2) $wHead[] = "$name (" . count($same) . ' mục)';
+    }
+    if (!$issues && $tot >= 20 && $any / $tot >= 0.2) $issues[] = 'Ghép ' . round($any / $tot * 100) . '% câu chữ từ nhiều bài đã có trên vfwild.vn: viết lại bằng lời mới.';
+    // cảnh báo gom một dòng mỗi loại (ô thông báo trên Sheet ngắn)
+    if ($wText) $warns[] = 'Có câu chữ giống bài ' . implode(', ', array_slice($wText, 0, 3)) . (count($wText) > 3 ? ' và ' . (count($wText) - 3) . ' bài khác' : '') . '.';
+    if ($wHead) $warns[] = 'Có tiêu đề mục giống bài ' . implode(', ', array_slice($wHead, 0, 3)) . (count($wHead) > 3 ? ' và ' . (count($wHead) - 3) . ' bài khác' : '') . '.';
+    return [$issues, $warns];
+}
+/** So bài mới với chữ và dàn ý của các trang web nguồn đã tra (auto_research_pages): [vấn đề buộc viết lại, cảnh báo]. */
+function auto_web_overlap(string $body, array $pages): array {
+    $issues = []; $warns = [];
+    $mine = auto_shingles($body); $tot = count($mine);
     preg_match_all('/^##\s+(.+)$/mu', $body, $hm);
-    $myH = array_map(fn($h) => $norm(preg_replace('/^\d{1,2}\s*[.):]\s+/u', '', $h) ?? $h), $hm[1] ?? []);
-    foreach ($rel as $p) {
-        $cp = auto_copy_ratio($body, $p['body'], 6);
-        $sameH = count(array_filter(array_map($norm, $p['heads']), fn($h) => $h !== '' && !preg_match('/^(câu hỏi thường gặp|kết luận|xem thêm|nguồn tham khảo)/u', $h) && in_array($h, $myH, true)));
-        if ($cp >= 0.12) $issues[] = 'Trùng ' . round($cp * 100) . '% câu chữ với bài đã có "' . $p['title'] . '": viết góc khác, không lặp nội dung.';
-        elseif ($cp >= 0.05) $warns[] = 'Có ' . round($cp * 100) . '% câu chữ giống bài "' . $p['title'] . '".';
-        if ($norm($title) === $norm($p['title'])) $issues[] = 'Tiêu đề trùng bài đã có "' . $p['title'] . '".';
-        if ($sameH >= 3) $warns[] = "Có {$sameH} tiêu đề mục trùng bài \"" . $p['title'] . '".';
+    foreach ($pages as $pg) {
+        $set = array_flip(auto_shingles((string)$pg['text']));
+        $hit = 0;
+        foreach ($mine as $h) { if (isset($set[$h])) $hit++; }
+        $cp = $tot >= 20 ? $hit / $tot : 0.0;
+        if ($cp >= 0.15) $issues[] = 'Chép ' . round($cp * 100) . '% câu chữ của trang ' . $pg['host'] . ': diễn đạt lại bằng lời riêng, không quá 6 chữ liên tiếp giống trang nguồn.';
+        elseif ($cp >= 0.05) $warns[] = 'Có ' . round($cp * 100) . '% câu chữ giống trang ' . $pg['url'] . '.';
+        $pH = array_values(array_filter((array)$pg['outline'], fn($l) => str_starts_with((string)$l, 'H2:')));
+        $same = auto_heads_alike($hm[1] ?? [], $pH);
+        if (count($same) >= 3 && count($same) * 2 >= max(1, count($pH))) $issues[] = 'Có ' . count($same) . ' tiêu đề mục giống trang ' . $pg['host'] . ': đặt tên và thứ tự mục theo cách riêng.';
     }
     return [$issues, $warns];
+}
+/**
+ * Dàn ý (ô Ghi chú) trùng dàn ý của nguồn nào: bài đã có trên vfwild.vn, bài tham khảo chungauto.vn, trang web nguồn.
+ * Trả về các dòng mô tả (rỗng nếu không trùng): một nguồn có từ 3 mục giống và chiếm từ nửa số mục của dàn ý.
+ */
+function auto_outline_dups(string $note, array $posts, ?array $ref, array $pages): array {
+    $mine = auto_outline_h2($note); $n = auto_heads_count($mine);
+    if ($n === 0) return [];
+    $srcs = [];
+    foreach ($posts as $p) {
+        if (!in_array(blog_state($p), ['published', 'draft', 'scheduled'], true)) continue;
+        preg_match_all('/^##\s+(.+)$/mu', (string)$p['body'], $om);
+        $srcs['bài "' . $p['title'] . '" trên vfwild.vn'] = $om[1] ?? [];
+    }
+    if ($ref) $srcs['bài chungauto.vn "' . $ref['title'] . '"'] = array_filter((array)$ref['outline'], fn($l) => str_starts_with((string)$l, 'H2:'));
+    foreach ($pages as $pg) $srcs['trang ' . $pg['host']] = array_filter((array)$pg['outline'], fn($l) => str_starts_with((string)$l, 'H2:'));
+    $out = [];
+    foreach ($srcs as $name => $heads) {
+        $same = auto_heads_alike($mine, $heads);
+        if (count($same) >= 3 && count($same) * 2 >= $n) $out[] = "$name: " . implode('; ', $same);
+    }
+    return $out;
 }
 /** Lời dặn riêng cho bài phụ kiện / độ xe VF Wild (rút ra từ cách viết và các lỗi hay gặp trên chungauto.vn). */
 function auto_accessory_rules(string $kw): string {

@@ -82,13 +82,13 @@ function img_host_public(string $host): bool {
     return true;
 }
 /** Tải một địa chỉ, tự theo chuyển hướng nhưng kiểm tra từng bước chỉ ra máy chủ công cộng; trả về [dữ liệu, loại nội dung]. */
-function img_http_get(string $url): array {
+function img_http_get(string $url, int $timeout = 25): array {
     for ($hop = 0; $hop < 5; $hop++) {
         $p = parse_url($url);
         $local = getenv('VFW_IMG_ALLOW_LOCAL') === '1';
         if (!$p || !isset($p['host']) || isset($p['user']) || isset($p['pass']) || !in_array($p['scheme'] ?? '', $local ? ['http', 'https'] : ['https'], true) || (!$local && isset($p['port']) && (int)$p['port'] !== 443)) throw new RuntimeException('Link ảnh không hợp lệ (chỉ nhận https).');
         if (!img_host_public((string)$p['host'])) throw new RuntimeException('Link ảnh trỏ tới địa chỉ không được phép.');
-        $ctx = stream_context_create(['http' => ['method' => 'GET', 'timeout' => 25, 'follow_location' => 0, 'ignore_errors' => true, 'header' => "User-Agent: vfwild-auto/1.0\r\nAccept: image/*,*/*;q=0.5\r\n"], 'ssl' => ['verify_peer' => true]]);
+        $ctx = stream_context_create(['http' => ['method' => 'GET', 'timeout' => $timeout, 'follow_location' => 0, 'ignore_errors' => true, 'header' => "User-Agent: vfwild-auto/1.0\r\nAccept: image/*,*/*;q=0.5\r\n"], 'ssl' => ['verify_peer' => true]]);
         $fp = @fopen($url, 'rb', false, $ctx);
         if (!$fp) throw new RuntimeException('Không tải được ảnh (mạng hoặc link hỏng).');
         $hdr = $http_response_header ?? [];

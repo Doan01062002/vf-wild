@@ -624,11 +624,16 @@ function auto_process(string $DIR, array $r, array $s): array {
             elseif ($sameH > 0) $sc['warnings'][] = "Có $sameH tiêu đề mục trùng bài tham khảo.";
             $sc['warnings'][] = 'Dùng bài tham khảo: ' . $r['ref']['url'] . '.';
         }
-        if ($r['related'] && !$mock) {   // không lặp bài cùng chủ đề đã có trên vfwild.vn: các lần đầu bắt viết lại góc khác; lần thử cuối vẫn lưu (kèm cảnh báo) để cùng từ khóa luôn viết được
-            [$ri, $rw] = auto_related_overlap($bodyFinal, $in['title'], $r['related']);
+        if (!$mock) {   // không lặp câu chữ, tiêu đề, dàn ý của mọi bài đã có trên vfwild.vn: các lần đầu bắt viết lại góc khác; lần thử cuối vẫn lưu (kèm cảnh báo) để cùng từ khóa luôn viết được
+            [$ri, $rw] = auto_site_overlap($bodyFinal, $in['title'], $posts, $facts);
             if ($ri && $attempts < (int)$s['max_attempts']) { $sc['issues'] = array_merge($ri, $sc['issues']); $sc['score'] = min($sc['score'], 49); $sc['force'] = true; }
             elseif ($ri) $rw = array_merge($ri, $rw);
             $sc['warnings'] = array_merge($sc['warnings'], $rw);
+        }
+        if (!empty($r['research']) && !$mock) {   // không chép câu chữ, dàn ý của các trang web nguồn đã tra (như với bài chungauto.vn: chép thì luôn viết lại)
+            [$wi, $ww] = auto_web_overlap($bodyFinal, auto_research_pages($DIR, $r['research']));
+            if ($wi) { $sc['issues'] = array_merge($wi, $sc['issues']); $sc['score'] = min($sc['score'], 49); $sc['force'] = true; }
+            $sc['warnings'] = array_merge($sc['warnings'], $ww);
         }
         if (!empty($r['research'])) $sc['warnings'][] = 'Đã tra cứu ' . count($r['research']['facts']) . ' dữ kiện trên web (' . implode(', ', array_slice(array_column((array)$r['research']['sources'], 'host'), 0, 4)) . ').';
         if ($sc['score'] < (int)$s['min_score'] || !empty($sc['force'])) {   // force: lỗi buộc viết lại (cụm cấm, chép, trùng bài) dù điểm tối thiểu đặt thấp
@@ -793,7 +798,7 @@ function auto_plan_row(string $DIR, array $s, array $r, array $posts): array {
     $blank = auto_plan_blank($r, !empty($s['auto_plan_note']));
     if (!$blank) return $r;
     $p = (string)$s['provider'];
-    [$facts, $ref] = auto_row_facts($DIR, $s, $r);
+    [$facts, $ref, $res] = auto_row_facts($DIR, $s, $r);
     $r['related'] = auto_related_existing($posts, (string)$r['keyword']);   // dàn ý chọn góc khác các bài cùng chủ đề đã có
     $imgNames = [];   // tên tệp ảnh thật (chỉ đọc danh sách, chưa tải ảnh) để dàn ý ghi đúng ảnh nào vào mục nào
     if (in_array('note', $blank, true) && trim((string)($r['images_cell'] ?? '')) !== '') {
@@ -813,6 +818,14 @@ function auto_plan_row(string $DIR, array $s, array $r, array $posts): array {
     }
     $vals = array_intersect_key(auto_plan_validate($j, blog_cats($DIR), (string)$r['keyword']), array_flip($blank));
     if (!$vals) throw new RuntimeException('AI không đưa được nội dung hợp lệ cho các ô còn trống.');
+    $dups = isset($vals['note']) ? auto_outline_dups($vals['note'], $posts, $ref, $res ? auto_research_pages($DIR, $res) : []) : [];
+    if ($dups) {   // dàn ý giống bài đã có / bài chungauto.vn / trang nguồn: lập lại một lần với lời dặn đổi các mục đó (bài viết bám dàn ý nên phải sửa từ đây)
+        try { $t2 = auto_ai_call($DIR, $p, auto_model($s, $p), $prompt . "\nDÀN Ý LẦN TRƯỚC BỊ TRÙNG DÀN Ý CỦA NGUỒN KHÁC (Google coi là nội dung sao chép):\n" . implode("\n", array_map(fn($d) => '- ' . $d, $dups)) . "\nHãy lập dàn ý MỚI theo góc khác: đặt lại tên các mục này theo cách nói riêng, đổi thứ tự, gộp hoặc tách mục, thêm mục mà các nguồn kia chưa có.\n", true, 300); $j2 = auto_json_decode($t2) ?? auto_plan_salvage($t2); }
+        catch (Throwable $e) { $j2 = null; }   // lập lại lỗi: giữ dàn ý đầu
+        $v2 =is_array($j2) ? array_intersect_key(auto_plan_validate($j2, blog_cats($DIR), (string)$r['keyword']), array_flip($blank)) : [];
+        if (isset($v2['note'])) $vals = $v2 + $vals;
+        auto_log($DIR, ['keyword' => $r['keyword'], 'result' => 'cảnh báo', 'msg' => 'Dàn ý đầu tiên trùng ' . implode(' | ', $dups) . (isset($v2['note']) ? ' – đã lập lại dàn ý theo góc khác.' : ' – lập lại không được, giữ dàn ý cũ.')]);
+    }
     $written = auto_cells_set($DIR, $s, (int)$r['row'], $vals);
     foreach ($written as $f => $v) $r[$f] = $v;
     $r['type'] = auto_type_for((string)$r['category'], (string)$r['form'], (string)$r['keyword']);
