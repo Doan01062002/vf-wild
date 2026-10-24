@@ -430,7 +430,7 @@ function blog_list_pages(string $prefix, string $suffix, string $web, array $pos
 function blog_toc_insert(string $html): string {
     if (!preg_match_all('#<h2 id="([^"]+)">(.*?)</h2>#su', $html, $m, PREG_SET_ORDER) || count($m) < 3) return $html;
     $li = '';
-    foreach ($m as $x) $li .= '<li><a href="#' . $x[1] . '">' . strip_tags($x[2]) . '</a></li>';
+    foreach ($m as $x) $li .= '<li><a href="#' . $x[1] . '">' . (preg_replace('/^\s*\d{1,2}(?:\.\d{1,2})*\s*[.):]\s*/u', '', strip_tags($x[2])) ?? strip_tags($x[2])) . '</a></li>';   // danh sách <ol> đã tự đánh số: bỏ số "1. " có sẵn ở tiêu đề mục để không hiện hai lần
     $toc = '<nav class="post__toc" aria-label="Mục lục"><strong>Mục lục</strong><ol>' . $li . '</ol></nav>';
     $pos = strpos($html, '</p>');
     return $pos === false ? $toc . $html : substr_replace($html, "</p>\n" . $toc, $pos, 4);
