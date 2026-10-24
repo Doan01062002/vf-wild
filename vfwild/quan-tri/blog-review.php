@@ -304,11 +304,13 @@ function blog_view_review(string $DIR, string $csrf, array $me): void {
         uasort($pending, fn($a, $b) => ($b['at'] ?? 0) <=> ($a['at'] ?? 0));
         $done = array_filter($reviews, fn($e) => in_array($e['status'] ?? '', ['ok', 'edited'], true));
         uasort($done, fn($a, $b) => ($b['rev_at'] ?? 0) <=> ($a['rev_at'] ?? 0));
+        [$pendPage, $rPage, $rPages] = admin_slice($pending, 'rp', 10);
+        [$donePage, $dPage, $dPages] = admin_slice($done, 'dp', 15);
         ?>
-      <section class="card">
+      <section class="card" id="cho-review">
         <h2>Bài AI vừa viết, chờ nhân viên SEO xem</h2>
         <p class="muted small">Mở bài, đọc kỹ rồi chọn: <b>Không cần sửa</b> hoặc sửa bài (nút “Sửa”) xong bấm <b>Đã sửa</b> và chọn lý do. Hệ thống tự so với bản AI viết ban đầu để rút kinh nghiệm cho các bài sau.</p>
-        <?php if (!$pending) { ?><div class="empty"><p>Không có bài nào chờ review.</p></div><?php } else { foreach ($pending as $slug => $e) { $p = blog_load($DIR, (string)$slug); if (!$p) continue; $ch = review_change($DIR, (string)$slug); ?>
+        <?php if (!$pending) { ?><div class="empty"><p>Không có bài nào chờ review.</p></div><?php } else { foreach ($pendPage as $slug => $e) { $p = blog_load($DIR, (string)$slug); if (!$p) continue; $ch = review_change($DIR, (string)$slug); ?>
           <div class="card" style="margin:.4rem 0">
             <div class="rowhead"><div><b><?= h($p['title']) ?></b><div class="muted small"><?= h((string)($e['keyword'] ?? '')) ?> · <?= h(trim(($e['provider'] ?? '') . ' ' . ($e['model'] ?? ''))) ?> · điểm <?= (int)($e['score'] ?? 0) ?> · <?= h(auto_ago((int)($e['at'] ?? 0))) ?></div></div>
               <div class="inline"><a class="btn btn--ghost" href="/blog/<?= h((string)$slug) ?>/" target="_blank" rel="noopener">Xem bài ↗</a><?php if ($canEdit) { ?><a class="btn btn--ghost" href="/quan-tri/?p=blog&amp;edit=<?= h(rawurlencode((string)$slug)) ?>">Sửa</a><?php } ?></div></div>
@@ -325,14 +327,15 @@ function blog_view_review(string $DIR, string $csrf, array $me): void {
             <?php } ?>
           </div>
         <?php } } ?>
+        <?= admin_pager($rPage, $rPages, count($pending), 10, 'rp', '', [], 0, null, 'cho-review') ?>
       </section>
-      <?php if ($done) { ?><section class="card"><h2>Đã review gần đây</h2><div class="tbl"><table class="wp-list"><thead><tr><th>Bài</th><th>Kết quả</th><th>Lý do</th><th>Người review</th></tr></thead><tbody>
-        <?php foreach (array_slice($done, 0, 15, true) as $slug => $e) { ?><tr>
+      <?php if ($done) { ?><section class="card" id="da-review"><h2>Đã review</h2><div class="tbl"><table class="wp-list"><thead><tr><th>Bài</th><th>Kết quả</th><th>Lý do</th><th>Người review</th></tr></thead><tbody>
+        <?php foreach ($donePage as $slug => $e) { ?><tr>
           <td class="title"><a href="/blog/<?= h((string)$slug) ?>/" target="_blank" rel="noopener"><?= h((string)$slug) ?></a></td>
           <td><span class="st <?= $e['status'] === 'ok' ? 'on' : 'off' ?>"><?= $e['status'] === 'ok' ? 'Không cần sửa' : 'Đã sửa ' . (int)($e['stats']['pct'] ?? 0) . '%' ?></span></td>
           <td class="small"><?= h(implode(', ', array_map(fn($x) => REVIEW_TAGS[$x] ?? $x, (array)($e['tags'] ?? [])))) ?><?= !empty($e['note']) ? ' – ' . h((string)$e['note']) : '' ?></td>
           <td class="small"><?= h((string)($e['by'] ?? '')) ?> · <?= h(auto_ago((int)($e['rev_at'] ?? 0))) ?></td></tr><?php } ?>
-      </tbody></table></div></section><?php } ?>
+      </tbody></table></div><?= admin_pager($dPage, $dPages, count($done), 15, 'dp', '', [], 0, null, 'da-review') ?></section><?php } ?>
 
     <?php } elseif ($t === 'stats') { $st = review_stats($DIR, 30); ?>
       <section class="card">
@@ -383,12 +386,13 @@ function blog_view_review(string $DIR, string $csrf, array $me): void {
           <label class="f"><span>Loại</span><select name="kind"><?php foreach (REVIEW_KINDS as $k => $lab) { ?><option value="<?= h($k) ?>"><?= h($lab) ?></option><?php } ?></select></label>
           <button class="btn" type="submit">Gửi đề xuất</button><p class="muted small">Quy tắc chỉ có hiệu lực sau khi Quản trị duyệt.</p></form></section><?php } ?>
 
-    <?php } else { $ed = array_reverse(review_edits($DIR, 30)); ?>
-      <section class="card"><h2>Các lần sửa gần đây (so với bản AI viết)</h2>
+    <?php } else { $edAll = array_reverse(review_edits($DIR, 300)); [$ed, $hPage, $hPages] = admin_slice($edAll, 'hp', 15); ?>
+      <section class="card" id="lich-su-sua"><h2>Các lần sửa gần đây (so với bản AI viết)</h2>
         <?php if (!$ed) { ?><p class="muted">Chưa có bài nào được ghi nhận “Đã sửa”.</p><?php } foreach ($ed as $e) { ?>
           <details class="note" style="margin:.4rem 0"><summary><b><?= h((string)($e['slug'] ?? '')) ?></b> · <?= h(implode(', ', array_map(fn($x) => REVIEW_TAGS[$x] ?? $x, (array)($e['tags'] ?? [])))) ?> · <?= (int)($e['stats']['pct'] ?? 0) ?>% · <?= h((string)($e['by'] ?? '')) ?> · <?= h(date('d/m H:i', (int)strtotime((string)($e['t'] ?? '')))) ?></summary>
             <?= !empty($e['note']) ? '<p class="small">Ghi chú: ' . h((string)$e['note']) . '</p>' : '' ?><?= review_diff_html((array)($e['hunks'] ?? [])) ?></details>
         <?php } ?>
+        <?= admin_pager($hPage, $hPages, count($edAll), 15, 'hp', '', [], 0, null, 'lich-su-sua') ?>
       </section>
     <?php } ?>
   </div>

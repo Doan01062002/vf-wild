@@ -13,6 +13,48 @@ function blog_qs(array $over = []): string {
     foreach ($over as $k => $v) { if ($v === null || $v === '') unset($q[$k]); else $q[$k] = $v; }
     return '/quan-tri/?' . http_build_query($q);
 }
+
+/* ---------- Phân trang dùng chung cho các danh sách trong trang quản trị ---------- */
+/** Số mục mỗi trang lấy từ tham số $key (chỉ nhận các giá trị trong $opts). */
+function admin_per(string $key, array $opts, int $def): int { $v = (int)($_GET[$key] ?? $def); return in_array($v, $opts, true) ? $v : $def; }
+/** Cắt một trang của danh sách: [các mục của trang, trang hiện tại, số trang]; số trang lấy từ tham số $key. */
+function admin_slice(array $items, string $key, int $per): array {
+    $pages = max(1, (int)ceil(count($items) / $per));
+    $page = min($pages, max(1, (int)($_GET[$key] ?? 1)));
+    return [array_slice($items, ($page - 1) * $per, $per, true), $page, $pages];
+}
+/** Địa chỉ trang hiện tại, đổi vài tham số (null = bỏ), giữ các tham số khác; $anchor đưa về đúng bảng sau khi bấm. */
+function admin_url(array $over, string $anchor = ''): string {
+    $q = [];
+    foreach ($_GET as $k => $v) { if (is_string($v) && $v !== '') $q[$k] = $v; }
+    foreach ($over as $k => $v) { if ($v === null || $v === '') unset($q[$k]); else $q[$k] = (string)$v; }
+    return '/quan-tri/?' . http_build_query($q) . ($anchor !== '' ? '#' . $anchor : '');
+}
+/**
+ * Thanh phân trang: "Trang x/y · n mục · Hiện 10 20 50 mỗi trang" và ‹ Trước 1 2 … Sau ›.
+ * $key: tham số số trang; $perKey, $perOpts, $perDef: tham số số mục mỗi trang ('' = không cho chọn); $url: hàm tạo địa chỉ (mặc định admin_url).
+ */
+function admin_pager(int $page, int $pages, int $total, int $per, string $key, string $perKey = '', array $perOpts = [], int $perDef = 0, ?callable $url = null, string $anchor = ''): string {
+    if ($total <= 0) return '';
+    $url ??= fn(array $o) => admin_url($o, $anchor);
+    $link = fn(int $i, string $label) => '<a href="' . h($url([$key => $i > 1 ? $i : null])) . '">' . $label . '</a>';
+    $h = '<div class="pagebar" aria-label="Phân trang"><span class="muted small">Trang ' . $page . '/' . $pages . ' · ' . $total . ' mục';
+    if ($perKey !== '' && $perOpts) {
+        $h .= ' · Hiện ';
+        foreach ($perOpts as $pp) $h .= ($pp === $per ? '<b>' . $pp . '</b>' : '<a href="' . h($url([$perKey => $pp === $perDef ? null : $pp, $key => null])) . '">' . $pp . '</a>') . ' ';
+        $h .= 'mỗi trang';
+    }
+    $h .= '</span>';
+    if ($pages > 1) {
+        $show = array_unique(array_filter([1, 2, $page - 1, $page, $page + 1, $pages - 1, $pages], fn($x) => $x >= 1 && $x <= $pages));
+        sort($show);
+        $h .= '<div class="pager">' . ($page > 1 ? $link($page - 1, '‹ Trước') : '<span class="off">‹ Trước</span>');
+        $prev = 0;
+        foreach ($show as $i) { if ($prev && $i > $prev + 1) $h .= '<span class="gap">…</span>'; $h .= $i === $page ? '<span class="on">' . $i . '</span>' : $link($i, (string)$i); $prev = $i; }
+        $h .= ($page < $pages ? $link($page + 1, 'Sau ›') : '<span class="off">Sau ›</span>') . '</div>';
+    }
+    return $h . '</div>';
+}
 function blog_script_files(array $names): string {
     $s = '';
     foreach ($names as $n) $s .= file_get_contents(__DIR__ . '/' . $n) . "\n";
@@ -155,23 +197,7 @@ function blog_view_list(string $DIR, string $csrf): void {
       <?php } ?>
     </form>
 
-    <?php if ($total > 0) {
-        $pageLink = fn(int $i, string $label, string $cls = '') => '<a' . ($cls !== '' ? ' class="' . $cls . '"' : '') . ' href="' . h(blog_qs(['paged' => $i > 1 ? $i : null])) . '">' . $label . '</a>';
-        $show = array_unique(array_filter([1, 2, $page - 1, $page, $page + 1, $pages - 1, $pages], fn($x) => $x >= 1 && $x <= $pages));
-        sort($show);
-    ?>
-    <div class="pagebar" aria-label="Phân trang">
-      <span class="muted small">Trang <?= (int)$page ?>/<?= (int)$pages ?> · <?= (int)$total ?> mục · Hiện
-        <?php foreach ([10, 20, 50, 100] as $pp) { ?><?= $pp === $per ? '<b>' . $pp . '</b>' : '<a href="' . h(blog_qs(['per' => $pp === 20 ? null : $pp, 'paged' => null])) . '">' . $pp . '</a>' ?> <?php } ?>mỗi trang</span>
-      <?php if ($pages > 1) { ?>
-      <div class="pager">
-        <?= $page > 1 ? $pageLink($page - 1, '‹ Trước') : '<span class="off">‹ Trước</span>' ?>
-        <?php $prev = 0; foreach ($show as $i) { if ($prev && $i > $prev + 1) { ?><span class="gap">…</span><?php } ?><?= $i === $page ? '<span class="on">' . $i . '</span>' : $pageLink($i, (string)$i) ?><?php $prev = $i; } ?>
-        <?= $page < $pages ? $pageLink($page + 1, 'Sau ›') : '<span class="off">Sau ›</span>' ?>
-      </div>
-      <?php } ?>
-    </div>
-    <?php } ?>
+    <?= admin_pager($page, $pages, $total, $per, 'paged', 'per', [10, 20, 50, 100], 20, fn(array $o) => blog_qs($o)) ?>
 
     <div class="rowhead muted small">
       <span>Mỗi lần lưu, bài được tạo lại thành trang tĩnh nên web luôn nhanh.</span>
@@ -438,13 +464,15 @@ function blog_view_edit(string $DIR, string $csrf, string $nonce, ?array $formSt
 function blog_view_media(string $DIR, string $csrf, string $nonce): void {
     $items = blog_media_items($DIR);
     $nUp = count(array_filter($items, fn($i) => $i['uploaded']));
+    $mPer = admin_per('mper', [24, 48, 96], 48);
+    [$pageItems, $mPage, $mPages] = admin_slice($items, 'mp', $mPer);
     ?>
   <div class="page">
     <div class="pagehead"><h1>Thư viện ảnh</h1><label class="btn btn--ghost sm" id="add-new">Thêm ảnh mới<input type="file" id="media-file" class="vh" accept="image/jpeg,image/png,image/webp" multiple></label><span class="muted small" id="media-msg" role="status" aria-live="polite"></span></div>
     <p class="muted small"><?= count($items) ?> ảnh (<?= (int)$nUp ?> ảnh bạn đã tải lên, còn lại là ảnh có sẵn của trang). Chỉ xóa được ảnh đã tải lên và chưa dùng trong bài nào.</p>
     <?php if (!$items) { ?><div class="wp-list empty"><p>Chưa có ảnh nào. Bấm “Thêm ảnh mới” để tải ảnh đầu tiên.</p></div><?php } ?>
     <div class="mpage">
-      <?php foreach ($items as $it) { ?>
+      <?php foreach ($pageItems as $it) { ?>
         <div class="mcard">
           <img src="<?= h($it['thumb']) ?>" alt="" loading="lazy">
           <div class="mcard__b">
@@ -453,12 +481,13 @@ function blog_view_media(string $DIR, string $csrf, string $nonce): void {
             <span class="muted"><?= $it['used'] > 0 ? 'Đang dùng trong ' . (int)$it['used'] . ' bài' : 'Chưa dùng' ?></span>
             <span class="rowact"><a href="<?= h($it['insert']) ?>" target="_blank" rel="noopener">Xem ảnh</a>
               <?php if ($it['uploaded'] && $it['used'] === 0) { ?><span class="sep">|</span>
-                <form method="post" class="inline" data-confirm="Xóa ảnh này vĩnh viễn?"><input type="hidden" name="action" value="blog_media_delete"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="id" value="<?= h($it['id']) ?>"><button type="submit" class="lnk danger">Xóa</button></form>
+                <form method="post" class="inline" data-confirm="Xóa ảnh này vĩnh viễn?"><input type="hidden" name="action" value="blog_media_delete"><input type="hidden" name="csrf" value="<?= $csrf ?>"><input type="hidden" name="id" value="<?= h($it['id']) ?>"><input type="hidden" name="mp" value="<?= (int)$mPage ?>"><input type="hidden" name="mper" value="<?= (int)$mPer ?>"><button type="submit" class="lnk danger">Xóa</button></form>
               <?php } ?></span>
           </div>
         </div>
       <?php } ?>
     </div>
+    <?= admin_pager($mPage, $mPages, count($items), $mPer, 'mp', 'mper', [24, 48, 96], 48) ?>
   </div>
   <script nonce="<?= h($nonce) ?>">window.VFW = <?= json_encode(['csrf' => $csrf], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?>;</script>
   <script nonce="<?= h($nonce) ?>">

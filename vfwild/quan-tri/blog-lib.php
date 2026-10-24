@@ -978,7 +978,8 @@ function blog_post(string $act, string $DIR): array {
                 if ($it['used'] > 0) return ['error' => 'Ảnh đang được dùng trong ' . $it['used'] . ' bài, hãy gỡ khỏi bài trước.'];
                 foreach ([800, 1200, 1600] as $sz) { $f = blog_web() . "/img/blog/$id-$sz.jpg"; if (is_file($f)) @unlink($f); }
                 blog_log($DIR, 'media-delete', $id);
-                return ['to' => '/quan-tri/?p=media&ok=media_deleted'];
+                $mp = (int)($_POST['mp'] ?? 1); $mper = (int)($_POST['mper'] ?? 0);   // quay lại đúng trang đang xem của thư viện
+                return ['to' => '/quan-tri/?p=media' . ($mp > 1 ? '&mp=' . $mp : '') . (in_array($mper, [24, 96], true) ? '&mper=' . $mper : '') . '&ok=media_deleted'];
             }
         }
         return ['error' => 'Không tìm thấy ảnh.'];

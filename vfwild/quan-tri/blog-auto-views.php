@@ -37,13 +37,16 @@ function blog_view_auto(string $DIR, string $csrf): void {
     $upRows = array_column($upcoming, 'row');
     $others = array_values(array_filter($rows, fn($r) => !in_array($r['row'], $upRows, true)));
     usort($others, fn($a, $b) => [$b['updated'], $b['row']] <=> [$a['updated'], $a['row']]);
-    $show = array_slice(array_merge($upcoming, $others), 0, 60);
+    $list = array_merge($upcoming, $others);   // dòng sắp viết lên đầu, rồi dòng mới cập nhật
+    $lPer = admin_per('lper', [20, 50, 100], 20);
+    [$show, $lPage, $lPages] = admin_slice($list, 'lp', $lPer);
     $next = $upcoming[0] ?? null;
     $nextText = !$s['enabled'] ? 'Đang tắt' : (!$next ? 'Chưa có bài nào chờ' : ($next['when'] === null ? 'Dòng kế tiếp chưa có giờ đăng' : date('H:i d/m/Y', $next['when']) . ' – ' . $next['keyword']));
     $facts = auto_facts($DIR);
     $sample = ['keyword' => 'VF Wild giá lăn bánh tại Hà Nội', 'type' => 'thu-tuc', 'form' => 'Hướng dẫn', 'intent' => 'Mua hàng', 'sub' => 'chi phí lăn bánh vf wild', 'note' => '', 'category' => 'Giá & ưu đãi'];
     $promptPreview = auto_prompt($s, $sample, $facts, auto_link_candidates(blog_all($DIR)), blog_cats($DIR), review_playbook_text($DIR));
-    $log = auto_log_tail($DIR, 30);
+    $logAll = auto_log_tail($DIR, 500);
+    [$log, $kPage, $kPages] = admin_slice($logAll, 'kp', 20);
     ?>
   <div class="page">
     <div class="pagehead"><h1>Tự động viết bài</h1>
@@ -77,12 +80,12 @@ function blog_view_auto(string $DIR, string $csrf): void {
       </details>
     </section>
 
-    <section class="card">
+    <section class="card" id="lich">
       <div class="rowhead"><h2>Lịch đăng (lấy từ Google Sheet)</h2>
         <?php if ($sheetId) { ?><a class="btn btn--ghost" href="https://docs.google.com/spreadsheets/d/<?= h($sheetId) ?>/edit" target="_blank" rel="noopener">Mở Google Sheet ↗</a><?php } ?></div>
       <p class="muted small">Cách dùng nhanh: chỉ cần điền <b>Từ khóa chính</b>, giờ đăng và đổi Trạng thái sang “Sẵn sàng” — <b>AI tự điền các ô còn trống</b> (Chuyên mục, Dạng bài, Ý định, Ưu tiên, Từ khóa phụ, Ghi chú / góc viết kèm dàn ý H1/H2) rồi mới viết; ô bạn đã nhập được giữ nguyên (bật/tắt ở Cài đặt → “AI điền cột còn trống”). Chi tiết: ở tab “Từ khóa”, ghi <b>giờ đăng vào cột “Ngày đăng mong muốn”</b> (ví dụ <code>2026-11-01 09:30</code>; chỉ ghi ngày thì dùng giờ mặc định <?= (int)$s['default_hour'] ?>:00) và đổi <b>cột “Trạng thái” sang “Sẵn sàng”</b>. Muốn dùng ảnh riêng, dán link ảnh (Google Drive để “Bất kỳ ai có đường liên kết”, hoặc link ảnh https) vào <b>cột “Ảnh (link)”</b>, nhiều ảnh cách nhau dấu <code>;</code> (hoặc dán link thư mục Drive). <b>Đặt tên tệp theo mục để ảnh vào đúng chỗ</b>: tiêu đề H2 của bài được tự đánh số 1., 2., 3.…; tệp <code>2-pin-sac-nhanh.jpg</code> (số đầu tên = số mục; hợp lệ: <code>2-…</code>, <code>02_…</code>, <code>muc2-…</code>, nhiều ảnh cùng mục thì <code>2a-…</code>, <code>2b-…</code>) sẽ nằm ở mục số 2, và AI viết mục đó đúng chủ đề tên tệp gợi ý. Ảnh bìa: tên bắt đầu bằng <code>0</code> hoặc <code>bia</code> (vd <code>0-vf-wild.jpg</code>); không đặt thì lấy ảnh không số đầu tiên. Không muốn đánh số thì chỉ cần <b>đặt tên tệp theo chủ đề</b> (vd <code>pin-sac-nhanh.jpg</code>, <code>bao-hanh.jpg</code>): ảnh được đặt vào mục có tiêu đề khớp chữ trong tên (từ 60% chữ trở lên), AI cũng được dặn viết mục đó; ảnh nào tên không khớp mục nào thì AI xem ảnh rồi tự chèn đúng chỗ. <b>Cột “Ghi chú / góc viết”</b> nhận cả dàn ý hoàn chỉnh: dòng <code>H1:</code> là tiêu đề bài, <code>H2:</code> / <code>H3:</code> là các mục (AI giữ đúng thứ tự và tên), <code>Từ khóa:</code> trong mỗi mục là từ khóa lồng vào mục đó, <code>Mở bài:</code> là chỉ dẫn viết đoạn mở đầu; ghi “tối ưu 1200 từ” thì bài dài khoảng 1200 từ (không ghi thì không giới hạn tối đa); yêu cầu như “bỏ mục …”, “sửa địa chỉ …” được làm đúng, các mục còn lại tự đánh số lại. Số liệu ghi trong ghi chú được dùng như dữ kiện. Chỉ dòng “Sẵn sàng” mới được đăng, đúng vào giờ đã ghi; dòng “Ý tưởng” không bao giờ tự đăng. Kết quả được ghi lại ở các cột Trạng thái, Mã, Tiêu đề bài, Link bài… Muốn hoãn một bài: đổi Trạng thái thành “Tạm dừng”.</p>
       <?php if ($sheetErr !== '') { ?><div class="note warn"><?= h($sheetErr) ?></div><?php } ?>
-      <?php if (!$show) { ?>
+      <?php if (!$list) { ?>
         <div class="empty"><p><?= $sheetId && $acc && $sheetErr === '' ? 'Sheet chưa có từ khóa nào.' : 'Nhập link Google Sheet và cấp quyền cho tài khoản dịch vụ ở mục Cài đặt bên dưới để hiện lịch đăng.' ?></p></div>
       <?php } else { ?>
       <div class="tbl"><table class="wp-list">
@@ -98,6 +101,7 @@ function blog_view_auto(string $DIR, string $csrf): void {
         <?php } ?>
         </tbody>
       </table></div>
+      <?= admin_pager($lPage, $lPages, count($list), $lPer, 'lp', 'lper', [20, 50, 100], 20, null, 'lich') ?>
       <?php } ?>
     </section>
 
@@ -172,12 +176,13 @@ function blog_view_auto(string $DIR, string $csrf): void {
       <textarea rows="14" readonly class="mono" aria-label="Câu lệnh mẫu"><?= h($promptPreview) ?></textarea>
     </details>
 
-    <details class="card guide">
-      <summary>Nhật ký (30 lần gần nhất)</summary>
+    <details class="card guide" id="nhat-ky"<?= isset($_GET['kp']) ? ' open' : '' ?>>
+      <summary>Nhật ký (<?= count($logAll) ?> lần gần nhất)</summary>
       <?php if (!$log) { ?><p class="muted">Chưa có hoạt động nào.</p><?php } else { ?>
       <div class="tbl"><table>
         <?php foreach ($log as $e) { ?><tr><td class="nowrap"><?= h(date('H:i d/m', (int)strtotime((string)($e['t'] ?? '')))) ?></td><td><?= h((string)($e['keyword'] ?? '')) ?></td><td><b><?= h((string)($e['result'] ?? '')) ?></b></td><td class="small"><?= h(mb_substr((string)($e['msg'] ?? ''), 0, 200)) ?></td></tr><?php } ?>
       </table></div>
+      <?= admin_pager($kPage, $kPages, count($logAll), 20, 'kp', '', [], 0, null, 'nhat-ky') ?>
       <?php } ?>
     </details>
   </div>

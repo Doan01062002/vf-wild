@@ -236,13 +236,13 @@ function blog_view_audit(string $DIR, string $csrf): void {
       <p class="muted small">Chỉ để xem và gợi ý, trang này không tự sửa nội dung bài (trừ nút gắn liên kết nội bộ ở trên). Bấm “Sửa” ở từng bài để chỉnh.</p>
     </section>
 
-    <section class="card">
+    <section class="card" id="tung-bai">
       <h2>Từng bài viết</h2>
-      <?php if (!$rows) { ?><div class="empty"><p>Chưa có bài đã đăng để kiểm tra.</p></div><?php } else { ?>
+      <?php if (!$rows) { ?><div class="empty"><p>Chưa có bài đã đăng để kiểm tra.</p></div><?php } else { $aPer = admin_per('aper', [20, 50, 100], 20); [$aRows, $aPage, $aPages] = admin_slice($rows, 'ap', $aPer); ?>
       <div class="tbl"><table class="wp-list">
         <thead><tr><th>Bài viết</th><th>Điểm SEO</th><th>Search Console (28 ngày)</th><th>Vấn đề cần xem</th></tr></thead>
         <tbody>
-        <?php foreach ($rows as $r) { $p = $r['post']; ?>
+        <?php foreach ($aRows as $r) { $p = $r['post']; ?>
           <tr>
             <td class="title"><b><?= h($p['title']) ?></b><div class="rowact small"><a href="/quan-tri/?p=blog&amp;edit=<?= h(rawurlencode($p['slug'])) ?>">Sửa</a> · <a href="/blog/<?= h($p['slug']) ?>/" target="_blank" rel="noopener">Xem</a> · <?= (int)$p['words'] ?> từ · <?= (int)$r['inbound'] ?> bài liên kết tới</div></td>
             <td><span class="st <?= $r['score'] >= 80 ? 'on' : ($r['score'] >= 60 ? 'off' : 'bad') ?>"><?= (int)$r['score'] ?>/100</span></td>
@@ -252,6 +252,7 @@ function blog_view_audit(string $DIR, string $csrf): void {
         <?php } ?>
         </tbody>
       </table></div>
+      <?= admin_pager($aPage, $aPages, count($rows), $aPer, 'ap', 'aper', [20, 50, 100], 20, null, 'tung-bai') ?>
       <?php } ?>
     </section>
 
