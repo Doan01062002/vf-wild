@@ -608,7 +608,7 @@ function blog_rebuild(string $DIR): array {
 function blog_upload(): array {
     $name = (string)($_POST['name'] ?? '');
     $f = $_FILES['file'] ?? null;
-    if (!preg_match('/^b[0-9a-z]{6,24}-(800|1200|1600)$/', $name)) return ['error' => 'Tên ảnh không hợp lệ.'];
+    if (!preg_match('/^[a-z0-9](?:[a-z0-9]|-(?!-)){5,90}-(800|1200|1600)$/', $name)) return ['error' => 'Tên ảnh không hợp lệ.'];   // tên theo nội dung (ghe-dien-honda-city-3f9a12-1200) hoặc mã cũ (b8c339…-1200); chỉ chữ thường, số, gạch ngang
     if (!$f || ($f['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) return ['error' => 'Không nhận được ảnh (có thể ảnh quá lớn).'];
     if ($f['size'] > BLOG_MAX_IMG) return ['error' => 'Ảnh sau khi nén vẫn lớn hơn 700 KB.'];
     $info = @getimagesize($f['tmp_name']);
@@ -867,6 +867,7 @@ function blog_post(string $act, string $DIR): array {
     if (strncmp($act, 'blog_audit_', 11) === 0) return audit_post($act, $DIR);
     if (strncmp($act, 'blog_review_', 12) === 0) return review_post($act, $DIR);
     if (strncmp($act, 'blog_user_', 10) === 0) return users_post($act, $DIR);
+    if (strncmp($act, 'blog_attach_', 12) === 0) return attach_post($act, $DIR);   // Gắn ảnh vào bài (blog-attach.php)
     $json = function (array $d) { header('Content-Type: application/json; charset=utf-8'); echo json_encode($d, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); exit; };
 
     if ($act === 'blog_upload') $json(blog_upload());
@@ -971,7 +972,7 @@ function blog_post(string $act, string $DIR): array {
     /* --- ảnh --- */
     if ($act === 'blog_media_delete') {
         $id = (string)($_POST['id'] ?? '');
-        if (!preg_match('/^b[0-9a-z]{6,24}$/', $id)) return ['error' => 'Chỉ xóa được ảnh đã tải lên.'];
+        if (!preg_match('/^[a-z0-9](?:[a-z0-9]|-(?!-)){5,90}$/', $id)) return ['error' => 'Chỉ xóa được ảnh đã tải lên.'];
         foreach (blog_media_items($DIR) as $it) {
             if ($it['uploaded'] && $it['id'] === $id) {
                 if ($it['used'] > 0) return ['error' => 'Ảnh đang được dùng trong ' . $it['used'] . ' bài, hãy gỡ khỏi bài trước.'];

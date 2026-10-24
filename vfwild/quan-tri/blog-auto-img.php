@@ -229,6 +229,27 @@ function img_exif_orientation(string $b): int {
     return 1;
 }
 /** Kiểm tra là ảnh thật và tạo 3 cỡ JPEG. Trả về ['id','files'=>[cỡ=>nhị phân],'w','h','note']. */
+/**
+ * Tên tệp ảnh theo nội dung (thay mã ngẫu nhiên b8c339…): "<chữ gợi ý không dấu>-<6 ký tự mã>" → "ghe-dien-honda-city-quy-trinh-3f9a12".
+ * Chữ gợi ý cắt ở ranh giới từ, tối đa 60 ký tự; mã ngắn lấy từ $uniq (mã nội dung ảnh) để hai ảnh không trùng tên. Rỗng gợi ý thì "anh".
+ */
+function img_seo_id(string $hint, string $uniq): string {
+    $s = blog_slugify($hint, 0);
+    if (strlen($s) > 60) { $s = substr($s, 0, 61); $s = substr($s, 0, (int)strrpos($s, '-') ?: 60); }
+    $s = trim($s, '-');
+    $u = substr(preg_replace('/[^a-z0-9]/', '', strtolower($uniq)) ?: md5($uniq), -6);
+    return ($s !== '' ? $s : 'anh') . '-' . $u;
+}
+/** Chữ gợi ý cho tên ảnh: từ khóa / tiêu đề bài + chủ đề trong tên tệp gốc (nếu tên tệp có nghĩa và chưa nằm trong từ khóa). */
+function img_name_hint(string $base, string $fileName): string {
+    $bt = blog_slugify($base, 0);
+    if (strlen($bt) > 40) { $bt = substr($bt, 0, 41); $bt = substr($bt, 0, (int)strrpos($bt, '-') ?: 40); }   // phần tiêu đề ngắn lại để còn chỗ cho chủ đề ảnh
+    $info = img_name_info($fileName);
+    $topic = $info['cover'] ? '' : img_topic($fileName);   // "bia", "cover" chỉ là quy ước đặt tên, không phải nội dung ảnh
+    if ($topic === '') return $bt;
+    $tt = blog_slugify($topic, 0);
+    return $bt !== '' && str_contains('-' . $bt . '-', '-' . $tt . '-') ? $bt : trim($bt . '-' . $tt, '-');
+}
 function img_process(string $bytes): array {
     $info = @getimagesizefromstring($bytes);
     if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) throw new RuntimeException('Tệp không phải ảnh JPG, PNG hoặc WebP.');
@@ -286,7 +307,7 @@ function img_order(array $images, array &$notes): array {
     return array_merge([$cover], array_values($images));
 }
 /** Tải và xử lý toàn bộ ảnh ở một ô. Trả về ['images' => [['cover','insert','b64','mime','src']…], 'errors' => […]]. */
-function img_prepare(string $DIR, string $cell, int $max = IMG_DEFAULT_MAX): array {
+function img_prepare(string $DIR, string $cell, int $max = IMG_DEFAULT_MAX, string $hint = ''): array {
     $errors = [];
     $sources = img_sources($DIR, $cell, $errors, $max);
     $vis = count($sources) > 8 ? 800 : 1200;   // nhiều ảnh thì gửi bản nhỏ hơn cho AI để yêu cầu không quá nặng
@@ -299,6 +320,7 @@ function img_prepare(string $DIR, string $cell, int $max = IMG_DEFAULT_MAX): arr
             $id = $map[$key] ?? '';
             if ($id === '' || !is_file(blog_web() . "/img/blog/$id-1200.jpg")) {
                 $proc = img_process($src['id'] ? img_fetch_drive($DIR, $src['id']) : img_fetch($src['raw'] ?? $src['link'], $DIR));
+                if ($hint !== '') $proc['id'] = img_seo_id(img_name_hint($hint, (string)$src['name']), $proc['id']);   // tên tệp theo nội dung: tải ảnh về có tên đúng chủ đề, tốt cho SEO ảnh
                 img_store($proc);
                 $id = $proc['id']; $map[$key] = $id;
             }
@@ -415,3 +437,4 @@ function img_place(string $body, array $images, array $plan, array &$warn = [], 
     foreach ($ins as [$at, , $md]) array_splice($lines, $at, 0, ['', $md, '']);
     return [implode("\n", $lines), count($ins)];
 }
+require_once __DIR__ . '/blog-attach.php';   // nút "Gắn ảnh vào bài" trong trang Sửa bài

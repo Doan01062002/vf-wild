@@ -315,3 +315,36 @@ textarea.mono{width:100%;box-sizing:border-box}
 .pagebar .muted a{margin:0 .15rem}
 .pager .off{opacity:.45}
 .pager .gap{border:0;background:none;padding:.25rem .1rem}
+
+/* Gắn ảnh vào bài (attach.js) */
+.att .mm__in{grid-template-rows:auto auto 1fr auto}
+.att__steps{display:flex;gap:.4rem;list-style:none;margin:0;padding:.5rem 1rem;border-bottom:1px solid var(--line2);background:#f6f7f7;font-size:.85rem;color:var(--muted)}
+.att__steps li{padding:.2rem .6rem;border-radius:999px}
+.att__steps li.on{background:var(--green-2);color:#fff;font-weight:600}
+.att__body{overflow:auto;padding:14px;min-height:0}
+.att__drive{display:flex;gap:.5rem;margin:.8rem 0 .3rem}
+.att__drive input{flex:1;min-width:0}
+.att__grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:.6rem}
+.att__tile{position:relative;border:1px solid var(--line2);border-radius:8px;padding:6px;background:#fff;display:grid;gap:4px}
+.att__tile img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:5px;background:#eef0ee}
+.att__cap{font-size:.78rem;word-break:break-all;line-height:1.25}
+.att__rm{position:absolute;top:4px;right:4px;border:0;border-radius:50%;width:24px;height:24px;background:rgba(0,0,0,.6);color:#fff;cursor:pointer;font-size:.75rem}
+.att__tbl{width:100%;border-collapse:collapse;font-size:.88rem}
+.att__tbl th,.att__tbl td{border-bottom:1px solid var(--line2);padding:.5rem;vertical-align:top;text-align:left}
+.att__tbl td:first-child{width:150px}
+.att__tbl td:nth-child(2){width:260px}
+.att__tbl select,.att__tbl input{width:100%;font:inherit}
+.att__tbl td:nth-child(3) input+input{margin-top:.35rem}
+.att__th{width:140px;aspect-ratio:4/3;object-fit:cover;border-radius:5px;display:block}
+.att__chk{display:flex;gap:.5rem;align-items:flex-start;margin-bottom:.6rem;font-size:.9rem}
+.att__ai{display:flex;gap:.4rem;align-items:center}
+.mm__f .grow{flex:1}
+#att-note{color:var(--green-2)}
+#att-note.danger,.att .danger{color:#b32d2e}
+@media (max-width:760px){
+  .att__tbl thead{display:none}
+  .att__tbl tr{display:grid;gap:.4rem;padding:.5rem 0;border-bottom:1px solid var(--line2)}
+  .att__tbl td{border:0;padding:0;width:auto!important}
+  .att__drive{flex-direction:column}
+  .mm__f{flex-wrap:wrap}
+}

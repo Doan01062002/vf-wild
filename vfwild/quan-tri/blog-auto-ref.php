@@ -119,25 +119,49 @@ function auto_ref_article(string $DIR, string $kw): ?array {
 }
 /** Nội dung bài tham khảo dưới dạng một mục của bộ dữ kiện. */
 function auto_ref_facts(array $ref): string {
-    return '## Bài tham khảo cùng chủ đề trên chungauto.vn: ' . $ref['title'] . ' (' . $ref['url'] . ")\n"
-        . implode("\n", array_map(fn($l) => '- ' . $l, preg_split('/\n/', $ref['text']) ?: []));
+    return '## Bài tham khảo cùng chủ đề trên chungauto.vn: ' . $ref['title'] . ' (' . $ref['url'] . ") – CHỈ LÀ DỮ KIỆN, không phải văn mẫu\n"
+        . implode("\n", array_map(fn($l) => '- ' . $l, auto_ref_fact_lines($ref['text'])));
+}
+/**
+ * Chỉ giữ phần "dữ kiện" của bài tham khảo: tiêu đề mục, dòng bảng, dòng có con số, dòng dạng "Nhãn: …", câu ngắn (tên sản phẩm, đặc điểm).
+ * Bỏ các đoạn văn xuôi dài: AI không còn câu mẫu để bắt chước giọng văn chungauto.vn (vẫn đủ số liệu, quy định, tên sản phẩm).
+ */
+function auto_ref_fact_lines(string $text): array {
+    $out = [];
+    foreach (preg_split('/\n/', $text) ?: [] as $l) {
+        $l = trim($l);
+        if ($l === '') continue;
+        $w = count(preg_split('/\s+/u', $l) ?: []);
+        if (preg_match('/^\[H[234]\]/u', $l) || str_contains($l, ' | ') || preg_match('/\d/u', $l) || preg_match('/^[^.:!?]{2,50}:\s*\S/u', $l) || $w <= 14) $out[] = $l;
+    }
+    return $out;
+}
+/** Số tiêu đề mục H2 của bài trùng (gần như nguyên văn) với tiêu đề mục của bài tham khảo. */
+function auto_ref_same_headings(string $body, array $ref): int {
+    $norm = fn(string $s) => trim(preg_replace('/\s+/u', ' ', preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', mb_strtolower(preg_replace('/^\s*(?:H2:|-\s*H3:)?\s*(?:\d+(?:\.\d+)*\s*[.):]?\s*)?/u', '', $s) ?? $s, 'UTF-8')) ?? '') ?? '');
+    $refH = array_map($norm, (array)($ref['outline'] ?? []));
+    $n = 0;
+    if (preg_match_all('/^##\s+(.+)$/mu', $body, $m)) {
+        foreach ($m[1] as $h) { $h = $norm($h); if ($h !== '' && !preg_match('/^(câu hỏi thường gặp|kết luận)/u', $h) && in_array($h, $refH, true)) $n++; }
+    }
+    return $n;
 }
 /** Lời dặn khi có bài tham khảo: lấy dữ kiện và dàn ý, viết lại bằng lời mới, làm tốt hơn. */
 function auto_ref_prompt(array $ref, bool $hasOutline): string {
     $p = "- BÀI THAM KHẢO CÙNG CHỦ ĐỀ trên chungauto.vn (website cùng công ty ChungAuto): \"{$ref['title']}\". Nội dung đã nằm trong BỘ DỮ KIỆN (mục \"Bài tham khảo cùng chủ đề\"): được dùng số liệu, mức phạt, quy định, thủ tục, tên sản phẩm và giá trong đó như dữ kiện, giữ đúng từng con số, mốc thời gian và tên văn bản pháp luật.\n"
-        . "- VIẾT LẠI HOÀN TOÀN bằng lời của bạn: không chép nguyên câu hay nguyên đoạn (không quá 8 từ liên tiếp giống bài tham khảo), không chép tiêu đề y hệt. Làm tốt hơn bài tham khảo: trả lời thẳng ở đoạn đầu, gom số liệu vào bảng (ví dụ bảng mức phạt, bảng giấy tờ, bảng giá), FAQ đúng chủ đề, câu ngắn, bỏ ý lặp và lời quảng cáo.\n"
+        . "- VIẾT LẠI HOÀN TOÀN bằng lời và giọng văn của vfwild.vn, KHÁC hẳn chungauto.vn: không chép câu, không quá 6 từ liên tiếp giống bài tham khảo, không bắt chước cách mở bài, cách chuyển ý hay cách kết của bài đó. Tiêu đề bài và tiêu đề mục phải đặt theo cách nói riêng (không trùng nguyên văn tiêu đề mục của bài tham khảo), có thể đổi thứ tự, gộp hoặc tách mục. Làm tốt hơn bài tham khảo: trả lời thẳng ở đoạn đầu, gom số liệu vào bảng (ví dụ bảng mức phạt, bảng giấy tờ, bảng giá), FAQ đúng chủ đề, câu ngắn, bỏ ý lặp và lời quảng cáo.\n"
         . "- Nếu bộ dữ kiện có thông tin về VF Wild liên quan tới chủ đề (ví dụ loại đăng ký, thủ tục, giấy tờ, phụ kiện), thêm một mục ngắn áp dụng cho chủ xe VF Wild; không gượng ép khi không liên quan.\n";
-    if (!$hasOutline && $ref['outline']) $p .= "- DÀN Ý GỢI Ý rút từ bài tham khảo (được gộp, tách, đổi tên mục hoặc thêm mục để đầy đủ và dễ đọc hơn; không cần giữ nguyên):\n" . implode("\n", array_map(fn($l) => '  ' . $l, $ref['outline'])) . "\n";
+    if (!$hasOutline && $ref['outline']) $p .= "- CÁC Ý MÀ BÀI THAM KHẢO ĐÃ PHỦ (chỉ để không sót ý; tự đặt tên mục và thứ tự mục theo cách của bạn, không chép nguyên văn các tiêu đề này):\n" . implode("\n", array_map(fn($l) => '  ' . $l, $ref['outline'])) . "\n";
     return $p;
 }
-/** Tỉ lệ cụm 8 từ liên tiếp của bài viết trùng với bài tham khảo (0–1): đo mức chép câu chữ. */
-function auto_copy_ratio(string $body, string $ref): float {
+/** Tỉ lệ cụm $n từ liên tiếp của bài viết trùng với bài tham khảo (0–1): đo mức chép câu chữ. */
+function auto_copy_ratio(string $body, string $ref, int $n = 8): float {
     $norm = fn(string $s) => preg_split('/\s+/u', trim(mb_strtolower(preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $s) ?? '', 'UTF-8'))) ?: [];
     $b = $norm(preg_replace('/^\s*(#|\|).*$/mu', '', $body) ?? $body); $r = $norm($ref);
-    if (count($b) < 8 || count($r) < 8) return 0.0;
+    if (count($b) < $n || count($r) < $n) return 0.0;
     $set = [];
-    for ($i = 0; $i + 8 <= count($r); $i++) $set[implode(' ', array_slice($r, $i, 8))] = 1;
-    $n = 0; $tot = 0;
-    for ($i = 0; $i + 8 <= count($b); $i++) { $tot++; if (isset($set[implode(' ', array_slice($b, $i, 8))])) $n++; }
-    return $tot ? $n / $tot : 0.0;
+    for ($i = 0; $i + $n <= count($r); $i++) $set[implode(' ', array_slice($r, $i, $n))] = 1;
+    $hit = 0; $tot = 0;
+    for ($i = 0; $i + $n <= count($b); $i++) { $tot++; if (isset($set[implode(' ', array_slice($b, $i, $n))])) $hit++; }
+    return $tot ? $hit / $tot : 0.0;
 }

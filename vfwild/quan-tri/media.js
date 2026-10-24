@@ -30,9 +30,19 @@
     return fetch('/quan-tri/', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) { if (!j.ok) throw new Error(j.error || 'Tải ảnh lỗi'); return j; });
   }
   function token() { return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function slug(s) { return String(s || '').toLowerCase().replace(/đ/g, 'd').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
+  function clip(s, n) { if (s.length <= n) return s; s = s.slice(0, n + 1); var k = s.lastIndexOf('-'); return (k > 10 ? s.slice(0, k) : s.slice(0, n)).replace(/-+$/, ''); }
+  // tên tệp ảnh theo nội dung (tải ảnh về có tên đúng chủ đề, tốt cho SEO ảnh): <tiêu đề bài rút gọn>-<tên tệp gốc nếu có nghĩa>-<mã ngắn>
+  function seoBase(file, hint) {
+    var n = slug(String(file && file.name || '').replace(/\.[a-z0-9]{2,5}$/i, ''));
+    if (/^(img|dsc|dscn|pxl|image|photo|picture|screenshot|z\d|anh|hinh|untitled)?-?\d*$/.test(n) || /^[a-z]{0,4}-?\d{3,}/.test(n)) n = '';   // IMG_1234, DSC0012, 20261023… = vô nghĩa
+    var t = $('f-title'), h = clip(slug(hint !== undefined ? hint : (t ? t.value.split(/[:|–]/)[0] : '')), 40);
+    var b = clip([h, n && h.indexOf(n) === -1 ? n : ''].filter(Boolean).join('-'), 70);
+    return (b || 'anh') + '-' + Math.random().toString(36).slice(2, 8);
+  }
   // mỗi ảnh được lưu 3 cỡ (800 / 1200 / 1600) để dùng làm ảnh đại diện hoặc ảnh trong bài
-  function uploadFile(file) {
-    var base = token(), sizes = [800, 1200, 1600], chain = Promise.resolve();
+  function uploadFile(file, hint) {
+    var base = seoBase(file, hint), sizes = [800, 1200, 1600], chain = Promise.resolve();
     sizes.forEach(function (s) { chain = chain.then(function () { return shrink(file, s, 0.82).then(function (b) { return send(b, base + '-' + s); }); }); });
     return chain.then(function () { return { id: base, insert: '/img/blog/' + base + '-1200.jpg', cover: '/img/blog/' + base + '-800.jpg' }; }).catch(function (e) {
       // gỡ các cỡ đã tải lên dở dang để thư viện không bị ảnh thiếu cỡ
@@ -117,5 +127,5 @@
       mm.showModal(); setTab('lib'); load();
     });
   }
-  window.VFWM = { uploadFile: uploadFile, openMedia: openMedia, token: token };
+  window.VFWM = { uploadFile: uploadFile, openMedia: openMedia, token: token, seoBase: seoBase, slug: slug };
 })();

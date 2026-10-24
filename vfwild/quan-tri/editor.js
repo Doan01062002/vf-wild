@@ -501,6 +501,22 @@
   // giữ phiên đăng nhập khi soạn bài lâu (tránh mất bài vì hết phiên): gọi nhẹ mỗi 10 phút
   setInterval(function () { fetch('/quan-tri/?p=account&hb=1', { credentials: 'same-origin', cache: 'no-store' }).catch(function () {}); }, 10 * 60 * 1000);
 
+  // cho popup "Gắn ảnh vào bài" (attach.js): đọc / thay nội dung Markdown đang soạn, đặt ảnh đại diện; bài chỉ lưu khi bấm Lưu nháp / Đăng
+  window.VFWE = {
+    getMd: function () { syncMd(); return ta.value; },
+    setMd: function (md) {
+      ta.value = md; markDirty();
+      if (mode !== 'visual') { form.dispatchEvent(new Event('input', { bubbles: true })); return Promise.resolve(); }
+      var fd = new FormData(); fd.append('action', 'blog_render'); fd.append('csrf', C.csrf); fd.append('body', md);
+      return fetch('/quan-tri/', { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+        wys.innerHTML = j.html || '<p><br></p>'; fixFigures(); edited = false; check();
+      });
+    },
+    setCover: function (url, alt, title) { setCover(url, alt); if (title !== undefined && title !== null) $('f-ctitle').value = title; markDirty(); },
+    cover: function () { return $('f-cover').value; },
+    title: function () { return $('f-title').value; }
+  };
+
   fixFigures();
   setCover($('f-cover').value, null);
   markVideo();

@@ -199,6 +199,31 @@ function blog_media_modal(): void { ?>
   </div></dialog>
 <?php }
 
+/** Popup "Gắn ảnh vào bài": 1. chọn ảnh (máy / Drive) → 2. duyệt mục, alt, chú thích → 3. chèn (attach.js). */
+function blog_attach_modal(): void { ?>
+  <dialog id="att" class="mm att" aria-labelledby="att-t"><div class="mm__in">
+    <div class="mm__h"><h2 id="att-t">Gắn ảnh vào bài</h2><button type="button" class="lnk" id="att-x">✕ Đóng</button></div>
+    <ol class="att__steps" aria-label="Các bước"><li class="on" data-step="1">1. Chọn ảnh</li><li data-step="2">2. Duyệt chỗ đặt</li><li data-step="3">3. Chèn vào bài</li></ol>
+    <div class="att__body">
+      <section id="att-s1">
+        <div class="drop" id="att-drop"><p><b>Kéo thả ảnh vào đây</b></p><label class="btn">Chọn ảnh từ máy<input type="file" id="att-file" class="vh" accept="image/jpeg,image/png,image/webp" multiple></label>
+          <p class="small muted">Đặt tên tệp theo nội dung để ảnh vào đúng mục: <code>bia.jpg</code> = ảnh đại diện, <code>2-gia.jpg</code> = mục 2, <code>quy-trinh-lap.jpg</code> = mục có chữ "quy trình lắp". Ảnh tên vô nghĩa (IMG_1234…) thì AI xem ảnh để chọn mục.</p></div>
+        <div class="att__drive"><input id="att-link" placeholder="hoặc dán link thư mục / ảnh Google Drive (chia sẻ: Bất kỳ ai có đường liên kết)" autocomplete="off" spellcheck="false" aria-label="Link Google Drive"><button type="button" class="btn btn--ghost sm" id="att-drive">Lấy ảnh từ Drive</button></div>
+        <p class="small" id="att-msg1" role="status" aria-live="polite"></p>
+        <div class="att__grid" id="att-grid"></div>
+      </section>
+      <section id="att-s2" hidden>
+        <label class="att__chk"><input type="checkbox" id="att-replace"> Gỡ các ảnh đang có trong thân bài rồi mới chèn ảnh mới (bỏ chọn = thêm cạnh ảnh cũ)</label>
+        <div class="tablewrap"><table class="att__tbl"><thead><tr><th>Ảnh</th><th>Đặt vào</th><th>Mô tả ảnh (alt) và chú thích</th></tr></thead><tbody id="att-rows"></tbody></table></div>
+        <p class="small muted" id="att-msg2" role="status" aria-live="polite"></p>
+      </section>
+    </div>
+    <div class="mm__f"><label class="small att__ai"><input type="checkbox" id="att-vision" checked> Cho AI xem ảnh để viết mô tả và chọn mục cho ảnh tên vô nghĩa</label><span class="grow"></span>
+      <button type="button" class="btn btn--ghost" id="att-back" hidden>← Chọn lại ảnh</button><button type="button" class="btn btn--ghost" id="att-cancel">Hủy</button>
+      <button type="button" class="btn" id="att-next" disabled>Phân tích →</button><button type="button" class="btn" id="att-ok" hidden>Chèn vào bài</button></div>
+  </div></dialog>
+<?php }
+
 /* ================= Soạn / sửa bài ================= */
 function blog_view_edit(string $DIR, string $csrf, string $nonce, ?array $formState): void {
     $slug = (string)($_GET['edit'] ?? '');
@@ -262,6 +287,9 @@ function blog_view_edit(string $DIR, string $csrf, string $nonce, ?array $formSt
         <div>
           <div class="editor-head">
             <button type="button" class="btn btn--ghost sm" id="add-media">🖼 Thêm ảnh</button>
+            <button type="button" class="btn btn--ghost sm" id="att-open" title="Tải nhiều ảnh lên, hệ thống đề xuất mục, mô tả và chú thích cho từng ảnh để bạn duyệt rồi chèn vào bài">📷 Gắn ảnh vào bài</button>
+            <button type="button" class="lnk small" id="att-rename" title="Đổi tên các ảnh đang mang mã ngẫu nhiên (b8c339…) thành tên theo nội dung bài và mục chứa ảnh">Đặt lại tên ảnh theo nội dung</button>
+            <span class="small" id="att-note" role="status" aria-live="polite"></span>
             <div class="tabs2" role="tablist" aria-label="Chế độ soạn thảo"><button type="button" class="on" data-mode="visual" role="tab" aria-selected="true">Trực quan</button><button type="button" data-mode="md" role="tab" aria-selected="false">Văn bản</button></div>
           </div>
           <div class="rte" id="rte">
@@ -398,11 +426,11 @@ function blog_view_edit(string $DIR, string $csrf, string $nonce, ?array $formSt
       <div class="dlg__b"><button type="button" class="btn btn--ghost sm" id="dlg-c">Hủy</button><button type="submit" class="btn sm" value="ok">Đồng ý</button></div>
     </form>
   </dialog>
-  <?php blog_media_modal(); ?>
+  <?php blog_media_modal(); blog_attach_modal(); ?>
 
   <script nonce="<?= h($nonce) ?>">window.VFW = <?= json_encode(['csrf' => $csrf, 'status' => $isPublishedStatus, 'orig' => $orig], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) ?>;</script>
   <script nonce="<?= h($nonce) ?>">
-<?= blog_script_files(['media.js', 'editor.js']) ?>
+<?= blog_script_files(['media.js', 'editor.js', 'attach.js']) ?>
   </script>
 <?php }
 

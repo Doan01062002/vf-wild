@@ -566,7 +566,7 @@ function auto_process(string $DIR, array $r, array $s): array {
         }
         $links = auto_link_candidates($posts, $kw);
         $cats = blog_cats($DIR);
-        $imgRes = $r['images_cell'] !== '' ? img_prepare($DIR, $r['images_cell'], (int)($s['max_images'] ?? IMG_DEFAULT_MAX)) : ['images' => [], 'errors' => []];
+        $imgRes = $r['images_cell'] !== '' ? img_prepare($DIR, $r['images_cell'], (int)($s['max_images'] ?? IMG_DEFAULT_MAX), auto_kw_core($kw) ?: $kw) : ['images' => [], 'errors' => []];
         $imgHits = 0;
         $imgs = auto_apply_outline_images($imgRes['images'], (string)$r['note'], $imgHits);   // dàn ý ở ô Ghi chú ghi ảnh nào vào mục nào
         $look =$imgs && auto_images_need_look($imgs, $s);   // ảnh đã đặt tên nhận dạng được (số mục hoặc chủ đề) thì không gửi ảnh cho AI: tiết kiệm token, dành cho việc viết bài
@@ -609,9 +609,12 @@ function auto_process(string $DIR, array $r, array $s): array {
         ];
         $sc = auto_score($in, $s, $facts, $r);
         if ($r['ref']) {   // viết từ bài tham khảo: đo mức chép câu chữ (chép nhiều thì bắt viết lại, chép ít thì nhắc biên tập)
-            $cp = auto_copy_ratio($bodyFinal, $r['ref']['text']);
-            if ($cp >= 0.3) { $sc['issues'][] = 'Chép câu chữ của bài tham khảo ' . round($cp * 100) . '% (phải viết lại bằng lời mới, không quá 8 từ liên tiếp giống bài tham khảo).'; $sc['score'] = min($sc['score'], 49); }
-            elseif ($cp >= 0.1) $sc['warnings'][] = 'Có ' . round($cp * 100) . '% câu chữ giống bài tham khảo ' . $r['ref']['url'] . ', nên đọc lại.';
+            $cp = auto_copy_ratio($bodyFinal, $r['ref']['text'], 6);   // cụm 6 từ liên tiếp: bắt cả kiểu chép đổi vài chữ
+            $sameH = auto_ref_same_headings($bodyFinal, $r['ref']); $refH = count(array_filter((array)$r['ref']['outline'], fn($l) => str_starts_with($l, 'H2:')));
+            if ($cp >= 0.15) { $sc['issues'][] = 'Chép câu chữ của bài tham khảo ' . round($cp * 100) . '% (phải viết lại bằng lời và giọng văn riêng, không quá 6 từ liên tiếp giống bài tham khảo).'; $sc['score'] = min($sc['score'], 49); }
+            elseif ($cp >= 0.05) $sc['warnings'][] = 'Có ' . round($cp * 100) . '% câu chữ giống bài tham khảo ' . $r['ref']['url'] . ', nên đọc lại.';
+            if ($sameH >= 3 && $sameH * 2 >= max(1, $refH)) { $sc['issues'][] = "Có $sameH tiêu đề mục trùng nguyên văn bài chungauto.vn: hãy đặt tên mục theo cách nói riêng."; $sc['score'] = min($sc['score'], 49); }
+            elseif ($sameH > 0) $sc['warnings'][] = "Có $sameH tiêu đề mục trùng bài tham khảo.";
             $sc['warnings'][] = 'Dùng bài tham khảo: ' . $r['ref']['url'] . '.';
         }
         if ($sc['score'] < (int)$s['min_score']) {
@@ -697,7 +700,7 @@ function auto_plan_prompt(array $r, array $blank, array $posts, array $cats, str
         . 'Chỉ cần điền các mục còn trống: ' . implode(', ', array_map(fn($f) => AUTO_PLAN_FIELDS[$f], $blank)) . ".\n"
         . ($note ? "KHUNG BÀI CHO LOẠI \"" . (AUTO_TYPES[$type] ?? $type) . "\" (dàn ý bám khung này, chỉ giữ các mục có dữ kiện): "
             . ($type === 'phu-kien' && auto_kw_other_car((string)$r['keyword']) ? str_replace([' (dựa vào đặc điểm thật của xe: bán tải điện, thùng hàng, đi phố và đi dã ngoại)', 'VF Wild'], ['', 'xe trong từ khóa'], $bp['outline']) . " Bài này cho xe trong từ khóa, không gắn dữ kiện VF Wild." : $bp['outline']) . "\n" : '')
-        . ($note && $ref && $ref['outline'] ? "DÀN Ý CỦA BÀI CÙNG CHỦ ĐỀ trên chungauto.vn (tham khảo để không sót ý; được gộp, tách, đổi tên hoặc thêm mục cho đầy đủ, rõ hơn; nội dung bài này nằm ở mục \"Bài tham khảo cùng chủ đề\" trong bộ dữ kiện, dùng được số liệu trong đó):\n" . implode("\n", array_map(fn($l) => '  ' . $l, $ref['outline'])) . "\n" : '')
+        . ($note && $ref && $ref['outline'] ? "CÁC Ý MÀ BÀI CÙNG CHỦ ĐỀ trên chungauto.vn ĐÃ PHỦ (chỉ để không sót ý; TỰ ĐẶT tên mục H1/H2 theo cách nói riêng của vfwild.vn, KHÔNG chép nguyên văn các tiêu đề này, được đổi thứ tự, gộp, tách hoặc thêm mục; số liệu của bài này nằm ở mục \"Bài tham khảo cùng chủ đề\" trong bộ dữ kiện):\n" . implode("\n", array_map(fn($l) => '  ' . $l, $ref['outline'])) . "\n" : '')
         . ($note && $imgNames ? "DANH SÁCH ẢNH biên tập đã chuẩn bị (tên tệp, theo thứ tự):\n" . implode("\n", array_map(fn($n) => '- ' . $n, $imgNames)) . "\n" : '')
         . "BỘ DỮ KIỆN của website (chỉ chọn mục/ý mà bộ dữ kiện này có thông tin):\n" . mb_substr($facts, 0, 30000, 'UTF-8') . "\n"
         . ($titles !== '' ? "Các bài đã có trên blog (chỉ để chọn góc viết khác và liên kết ý, không bắt buộc):\n$titles\n" : '')

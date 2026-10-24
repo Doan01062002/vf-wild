@@ -236,14 +236,28 @@ function auto_outline_rules(): string {
  * nhưng tiết chế hơn (chungauto in đậm từ khóa tới 15 lần một bài, trông như nhồi). $kw = từ khóa chính.
  */
 function auto_format_rules(string $kw): string {
-    return "TRÌNH BÀY (bắt buộc, giống cách viết dễ đọc của chungauto.vn):\n"
-        . "- Mỗi mục H2: mở bằng 1–2 câu nêu ý chính; khi mục có từ 3 ý song song trở lên (đặc điểm, lợi ích, hạn chế, loại, lưu ý, kinh nghiệm, giấy tờ) thì trình bày bằng danh sách gạch đầu dòng, mỗi dòng mở bằng nhãn ngắn in đậm kết thúc bằng dấu hai chấm rồi 1–2 câu giải thích, ví dụ \"- **Giữ màn hình zin:** kết nối qua cổng USB nên không phải thay màn hình.\"; có thể kết mục bằng một câu chốt ngắn (\"Nhìn chung, …\").\n"
+    return "TRÌNH BÀY (bắt buộc, dễ đọc lướt):\n"
+        . "- Mỗi mục H2: mở bằng 1–2 câu nêu ý chính; khi mục có từ 3 ý song song trở lên (đặc điểm, lợi ích, hạn chế, loại, lưu ý, kinh nghiệm, giấy tờ) thì trình bày bằng danh sách gạch đầu dòng, mỗi dòng mở bằng nhãn ngắn in đậm kết thúc bằng dấu hai chấm rồi 1–2 câu giải thích, ví dụ \"- **Giữ màn hình zin:** kết nối qua cổng USB nên không phải thay màn hình.\"; nếu cần câu chốt cuối mục thì phải có thông tin mới (một lời khuyên chọn, một con số), và mỗi mục chốt theo một cách khác nhau.\n"
         . "- Quy trình, các bước, thủ tục: danh sách đánh số \"1. **Tên bước:** làm gì, ở đâu, mất bao lâu\". So sánh nhiều mẫu, nhiều mức giá hoặc mức phạt: dùng bảng.\n"
         . "- In đậm (**…**) có chọn lọc: từ khóa chính \"$kw\" ở lần xuất hiện đầu tiên trong đoạn mở đầu và tối đa một lần trong mỗi mục; con số quan trọng (giá, mức phạt, thời gian, dung lượng); nhãn đầu mỗi gạch đầu dòng; chữ \"**Lưu ý:**\" khi nhắc điều cần cẩn thận. Không in đậm cả câu dài, không in đậm trong tiêu đề H2/H3, trung bình không quá một cụm in đậm cho mỗi 40 chữ.\n"
         . "- Đoạn văn tối đa 3 câu và không quá 70 chữ; ý dài thì tách đoạn hoặc chuyển thành gạch đầu dòng. Cả bài có ít nhất 2 danh sách gạch đầu dòng hoặc đánh số.\n"
         . "- Từ khóa phụ: mỗi cụm dùng tối đa 1–2 lần, chỉ ở câu mà nó đọc tự nhiên; KHÔNG in đậm từ khóa phụ; không ghép nhiều từ khóa phụ trong một câu, không viết câu chỉ để chứa từ khóa. Đặc biệt không kết mục bằng câu kiểu \"Những kinh nghiệm … này giúp bạn …\", \"Tuân thủ đúng quy trình … sẽ …\", \"Tham khảo … giúp bạn chủ động …\": câu chốt phải có thông tin mới, không có thì bỏ. Đọc lên phải như người viết thật.\n"
         . "- Tên riêng viết hoa đúng: Honda City, VinFast VF Wild, VF6, Toyota, Apple CarPlay… (kể cả khi từ khóa phụ trong Sheet viết thường).\n"
-        . "- Liên kết nội bộ chỉ chèn vào câu khi đúng chủ đề câu đó; không có trang liên quan thì đừng gượng ép (hệ thống tự thêm mục \"Xem thêm\" cuối bài).\n";
+        . "- Liên kết nội bộ chỉ chèn vào câu khi đúng chủ đề câu đó; không có trang liên quan thì đừng gượng ép (hệ thống tự thêm mục \"Xem thêm\" cuối bài).\n"
+        . auto_voice_rules();
+}
+/**
+ * Cụm "văn mẫu" lặp ở hàng trăm tới hơn nghìn bài chungauto.vn (thống kê 2.137 bài, 24/10/2026) và các cụm sáo hay gặp ở bài AI.
+ * Bài vfwild.vn không dùng để giọng văn không bị giống và không lặp.
+ */
+const AUTO_CLICHES = ['trong bài viết này', 'bài viết dưới đây', 'các chuyên gia tại chungauto', 'đội ngũ chuyên gia', 'để được tư vấn chi tiết', 'hãy liên hệ ngay', 'liên hệ ngay với', 'trung tâm độ xe uy tín', 'địa chỉ uy tín', 'giàu kinh nghiệm', 'tay nghề cao', 'cam kết chính hãng', 'là một trong những', 'dưới đây là', 'an toàn và nhanh chóng', 'nhanh chóng và chuyên nghiệp', 'trên thị trường hiện nay', 'chi tiết nhất', 'tại sao nên', 'nhìn chung', 'giải pháp tối ưu', 'vượt trội', 'nâng tầm', 'đẳng cấp', 'hoàn hảo', 'mang lại trải nghiệm', 'trải nghiệm tuyệt vời', 'không thể bỏ qua', 'lựa chọn hàng đầu', 'xu hướng'];
+/** Giọng văn riêng của vfwild.vn (khác chungauto.vn), gắn vào câu lệnh viết bài. */
+function auto_voice_rules(): string {
+    return "GIỌNG VĂN RIÊNG CỦA VFWILD.VN (khác chungauto.vn, không lặp):\n"
+        . "- Viết như một tư vấn viên đang trả lời trực tiếp một khách cụ thể: đi thẳng vào câu trả lời, dùng tình huống thật (đi phố, chở hàng, đi tỉnh, gia đình có trẻ nhỏ), so sánh cụ thể thay cho tính từ chung chung.\n"
+        . "- Thay đổi cách mở câu: không mở nhiều câu (hay nhiều mục) bằng cùng một cụm; không lặp cùng một cụm từ quá 2 lần trong bài (trừ từ khóa chính và tên riêng); mỗi mục mở bằng một kiểu câu khác.\n"
+        . "- KHÔNG dùng các cụm văn mẫu sau (giống hàng nghìn bài khác): " . implode(', ', array_map(fn($x) => "\"$x\"", AUTO_CLICHES)) . ".\n"
+        . "- Không mở bài bằng \"Trong bài viết này…\"/\"Bạn đang tìm…\", không kết bằng \"Hãy liên hệ ngay…\"; lời mời liên hệ chỉ một câu ở kết luận, nói rõ được gì (báo giá theo mẫu, lịch lắp, showroom gần nhất).\n";
 }
 /** Phần cốt của từ khóa để in đậm ("Cà Vẹt Xe Là Gì?" → "Cà Vẹt Xe"); rỗng nếu quá ngắn. */
 function auto_kw_core(string $kw): string {
@@ -474,7 +488,33 @@ function auto_repeats(string $body, string $kw = ''): array {
         if (isset($seen[$k])) { $out[] = 'câu lặp nguyên văn: "' . mb_substr($sent, 0, 50, 'UTF-8') . '…"'; break; }
         $seen[$k] = 1;
     }
+    // văn lặp kiểu mẫu: nhiều câu mở bằng cùng 2 chữ ("Nhìn chung, …", "Việc lắp …"), một cụm 4 chữ dùng đi dùng lại (trừ từ khóa chính)
+    $kwTok = array_flip(explode(' ', mb_strtolower(trim((string)preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', auto_kw_core($kw) ?: $kw)), 'UTF-8')));
+    $plain = mb_strtolower(preg_replace(['/\]\([^)]*\)/u', '/[*_`\[\]]+/u', '/^\s*([-*]|\d+\.)\s+/mu'], [' ', '', ''], $text) ?? $text, 'UTF-8');
+    $open = [];
+    foreach (preg_split('/(?<=[.!?:])\s+|\n+/u', $plain) ?: [] as $sent) {
+        $w = preg_split('/[^\p{L}\p{N}]+/u', trim($sent), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        if (count($w) < 5 || (isset($kwTok[$w[0]]) && isset($kwTok[$w[1]]))) continue;   // câu mở bằng từ khóa chính là tự nhiên
+        $o = $w[0] . ' ' . $w[1]; $open[$o] = ($open[$o] ?? 0) + 1;
+    }
+    arsort($open);
+    foreach ($open as $o => $c) { if ($c >= 4) $out[] = "{$c} câu mở đầu bằng \"{$o}…\""; break; }
+    $w = preg_split('/[^\p{L}\p{N}]+/u', $plain, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    $g = [];
+    for ($i = 0; $i + 4 <= count($w); $i++) {
+        $gram = array_slice($w, $i, 4);
+        if (array_filter($gram, fn($x) => isset($kwTok[$x]) || ctype_digit($x))) continue;
+        $k = implode(' ', $gram); $g[$k] = ($g[$k] ?? 0) + 1;
+    }
+    arsort($g);
+    foreach (array_slice($g, 0, 2, true) as $k => $c) { if ($c >= max(5, (int)ceil(count($w) / 180))) $out[] = "cụm \"{$k}\" lặp {$c} lần"; }   // thuật ngữ của chủ đề lặp theo độ dài bài là tự nhiên
     return $out;
+}
+/** Các cụm văn mẫu (AUTO_CLICHES) có trong bài. */
+function auto_cliche_hits(string $body): array {
+    $t = mb_strtolower(str_replace('**', '', $body), 'UTF-8'); $hit = [];
+    foreach (AUTO_CLICHES as $c) { if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote($c, '/') . '(?![\p{L}\p{N}])/u', $t)) $hit[] = $c; }
+    return $hit;
 }
 /** Số danh sách (gạch đầu dòng / đánh số), số cụm in đậm, số đoạn văn thường dài quá 70 chữ (không tính bảng, tiêu đề, ảnh). */
 function auto_format_stats(string $body): array {
@@ -552,7 +592,8 @@ function auto_score(array $post, array $s, string $facts, array $row = []): arra
     $check('placeholder', $ph < 2, 6, "Bảng có $ph ô \"cho có\" (Tham khảo tư vấn viên, Liên hệ…): bỏ dòng thiếu dữ liệu thay vì ghi chữ giữ chỗ.");
     $fl = []; $tl2 = mb_strtolower($body, 'UTF-8');
     foreach (AUTO_FLUFF as $f) { if (mb_strpos($tl2, $f, 0, 'UTF-8') !== false) $fl[] = $f; }
-    $check('fluff', count($fl) < 2, 4, 'Có câu sáo rỗng: ' . implode(', ', array_slice($fl, 0, 4)) . '. Đi thẳng vào thông tin.');
+    $cl = auto_cliche_hits($body);   // cụm văn mẫu của chungauto.vn / bài AI: dùng 3 cụm trở lên là giọng văn bị "đúc khuôn"
+    $check('fluff', count($fl) < 2 && count($cl) < 3, 4, 'Có câu sáo rỗng hoặc văn mẫu: ' . implode(', ', array_slice(array_merge($fl, $cl), 0, 5)) . '. Viết bằng giọng riêng, đi thẳng vào thông tin.');
     $rp = auto_repeats($body, $kw);
     $check('repeat', !$rp, 4, 'Nội dung lặp lại: ' . implode('; ', array_slice($rp, 0, 3)) . '. Mỗi dữ kiện chỉ nên nêu đầy đủ một lần.');
 
